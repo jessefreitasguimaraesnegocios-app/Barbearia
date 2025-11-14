@@ -9,10 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/components/ui/use-toast";
-import { Collaborator, COLLABORATOR_ROLES, CollaboratorRole, DEFAULT_COLLABORATORS } from "@/data/collaborators";
+import { Collaborator, COLLABORATOR_ROLES, CollaboratorRole, PaymentMethod, DEFAULT_COLLABORATORS } from "@/data/collaborators";
 import { loadCollaborators, persistCollaborators, resetCollaboratorsToDefault } from "@/lib/collaborators-storage";
 import { hashPassword } from "@/lib/password";
-import { ArrowLeft, Trash2, RefreshCcw, Plus, Shield, Mail, Phone, UserCircle } from "lucide-react";
+import { ArrowLeft, Trash2, RefreshCcw, Plus, Shield, Mail, Phone, UserCircle, Eye } from "lucide-react";
 
 interface CollaboratorFormState {
   name: string;
@@ -22,6 +22,7 @@ interface CollaboratorFormState {
   role: CollaboratorRole;
   specialty: string;
   password: string;
+  paymentMethod: PaymentMethod | "";
 }
 
 const INITIAL_FORM_STATE: CollaboratorFormState = {
@@ -32,6 +33,7 @@ const INITIAL_FORM_STATE: CollaboratorFormState = {
   role: "barbeiro",
   specialty: "",
   password: "",
+  paymentMethod: "",
 };
 
 const AdminCollaborators = () => {
@@ -71,6 +73,7 @@ const AdminCollaborators = () => {
         role: selectedCollaborator.role,
         specialty: selectedCollaborator.specialty,
         password: "",
+        paymentMethod: selectedCollaborator.paymentMethod || "",
       });
     } else {
       setFormState(INITIAL_FORM_STATE);
@@ -156,6 +159,7 @@ const AdminCollaborators = () => {
                 role: formState.role,
                 specialty: formState.specialty.trim(),
                 password: applyPassword(collaborator.password),
+                paymentMethod: formState.paymentMethod || undefined,
               }
             : collaborator,
         ),
@@ -177,6 +181,7 @@ const AdminCollaborators = () => {
       role: formState.role,
       specialty: formState.specialty.trim(),
       password: hashPassword(formState.password || normalizedCpf),
+      paymentMethod: formState.paymentMethod || undefined,
       createdAt: new Date().toISOString(),
     };
 
@@ -231,7 +236,7 @@ const AdminCollaborators = () => {
         <div className="container mx-auto px-4">
           <div className="flex flex-col gap-4 mb-8">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+              <Button variant="ghost" size="icon" onClick={() => navigate("/admin")}>
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <div>
@@ -287,40 +292,50 @@ const AdminCollaborators = () => {
                 {collaborators.map((collaborator) => {
                   const isActive = collaborator.id === activeId;
                   return (
-                    <button
-                      key={collaborator.id}
-                      onClick={() => handleSelectCollaborator(collaborator.id)}
-                      className={`w-full rounded-lg border px-4 py-3 text-left transition ${
-                        isActive
-                          ? "border-primary bg-primary/5 shadow-gold"
-                          : "border-border hover:border-primary/50"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-semibold flex items-center gap-2">
-                            <UserCircle className="h-4 w-4 text-primary" />
-                            {collaborator.name}
-                          </p>
-                          <span className="text-xs text-muted-foreground flex items-center gap-2">
-                            <Mail className="h-3 w-3 text-muted-foreground" />
-                            {collaborator.email}
-                          </span>
-                          {collaborator.specialty && (
-                            <span className="text-xs text-muted-foreground flex items-center gap-2 mt-1">
-                              <Shield className="h-3 w-3 text-muted-foreground" />
-                              {collaborator.specialty}
+                    <div key={collaborator.id} className="space-y-2">
+                      <button
+                        onClick={() => handleSelectCollaborator(collaborator.id)}
+                        className={`w-full rounded-lg border px-4 py-3 text-left transition ${
+                          isActive
+                            ? "border-primary bg-primary/5 shadow-gold"
+                            : "border-border hover:border-primary/50"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-semibold flex items-center gap-2">
+                              <UserCircle className="h-4 w-4 text-primary" />
+                              {collaborator.name}
+                            </p>
+                            <span className="text-xs text-muted-foreground flex items-center gap-2">
+                              <Mail className="h-3 w-3 text-muted-foreground" />
+                              {collaborator.email}
                             </span>
-                          )}
+                            {collaborator.specialty && (
+                              <span className="text-xs text-muted-foreground flex items-center gap-2 mt-1">
+                                <Shield className="h-3 w-3 text-muted-foreground" />
+                                {collaborator.specialty}
+                              </span>
+                            )}
+                          </div>
+                          <Badge variant="outline">
+                            {
+                              COLLABORATOR_ROLES.find((role) => role.value === collaborator.role)?.label ??
+                              collaborator.role
+                            }
+                          </Badge>
                         </div>
-                        <Badge variant="outline">
-                          {
-                            COLLABORATOR_ROLES.find((role) => role.value === collaborator.role)?.label ??
-                            collaborator.role
-                          }
-                        </Badge>
-                      </div>
-                    </button>
+                      </button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => navigate(`/admin/colaboradores/${collaborator.id}`)}
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        Ver Detalhes
+                      </Button>
+                    </div>
                   );
                 })}
               </CardContent>
@@ -409,6 +424,25 @@ const AdminCollaborators = () => {
                         required
                       />
                     </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="collaborator-payment-method">Forma de Pagamento</Label>
+                      <Select
+                        value={formState.paymentMethod || undefined}
+                        onValueChange={(value) => handleInputChange("paymentMethod", value as PaymentMethod | "")}
+                      >
+                        <SelectTrigger id="collaborator-payment-method">
+                          <SelectValue placeholder="Selecione a forma de pagamento" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="salario-fixo">Salário Fixo</SelectItem>
+                          <SelectItem value="aluguel-cadeira-100">Aluguel de Cadeira - Recebe 100% por cliente</SelectItem>
+                          <SelectItem value="aluguel-cadeira-50">Aluguel de Cadeira - Recebe 50% por cliente</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="collaborator-password">
                         {selectedCollaborator ? "Nova senha (opcional)" : "Senha de acesso"}

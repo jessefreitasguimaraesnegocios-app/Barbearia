@@ -1,16 +1,138 @@
 import { Navbar } from "@/components/Navbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, Users, DollarSign, Package, TrendingUp, Clock, UserCog, Wallet, UserCircle, Scissors, ShoppingBag } from "lucide-react";
+import {
+  Calendar,
+  Users,
+  DollarSign,
+  Package,
+  TrendingUp,
+  Clock,
+  UserCog,
+  Wallet,
+  UserCircle,
+  Scissors,
+  ShoppingBag,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { useState, type MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
+
+type StatItem = {
+  key: string;
+  title: string;
+  value: string;
+  icon: LucideIcon;
+  color: string;
+  onCardClick?: () => void;
+  onIconClick?: (event: MouseEvent<HTMLButtonElement>) => void;
+};
+
+const revenueViews = [
+  { title: "Faturamento Mensal", value: "R$ 28.450" },
+  { title: "Faturamento Semanal", value: "R$ 6.580" },
+  { title: "Faturamento Diário", value: "R$ 940" },
+];
+
+const bookingViews = [
+  { title: "Agendamentos Hoje", value: "23" },
+  { title: "Agendamentos Semanal", value: "142" },
+  { title: "Agendamentos Mensal", value: "587" },
+];
+
+const inventoryViews = [
+  { title: "Estoque da Loja", value: "45" },
+  { title: "Estoque da Barbearia", value: "42" },
+];
+
+const clientViews = [
+  { title: "Cliente Vip Ativo", value: "28" },
+  { title: "Cliente vip inativo", value: "12" },
+];
 
 const Admin = () => {
   const navigate = useNavigate();
-  const stats = [
-    { title: "Agendamentos Hoje", value: "23", icon: Calendar, color: "text-primary" },
-    { title: "Clientes Ativos", value: "156", icon: Users, color: "text-blue-500" },
-    { title: "Faturamento Mensal", value: "R$ 28.450", icon: DollarSign, color: "text-green-500" },
-    { title: "Produtos em Estoque", value: "87", icon: Package, color: "text-orange-500" },
+  const [revenueViewIndex, setRevenueViewIndex] = useState(0);
+  const [isRevenueHidden, setIsRevenueHidden] = useState(false);
+  const [bookingViewIndex, setBookingViewIndex] = useState(0);
+  const [inventoryViewIndex, setInventoryViewIndex] = useState(0);
+  const [clientViewIndex, setClientViewIndex] = useState(0);
+
+  const baseStats: StatItem[] = [
+    { key: "bookings", title: "Agendamentos Hoje", value: "23", icon: Calendar, color: "text-primary" },
+    { key: "clients", title: clientViews[0].title, value: clientViews[0].value, icon: Users, color: "text-blue-500" },
+    { key: "revenue", title: revenueViews[0].title, value: revenueViews[0].value, icon: DollarSign, color: "text-green-500" },
+    { key: "inventory", title: inventoryViews[0].title, value: inventoryViews[0].value, icon: Package, color: "text-orange-500" },
   ];
+
+  const handleRevenueCardClick = () => {
+    setRevenueViewIndex((prev) => (prev + 1) % revenueViews.length);
+  };
+
+  const handleRevenueIconClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    setIsRevenueHidden((prev) => !prev);
+  };
+
+  const handleBookingCardClick = () => {
+    setBookingViewIndex((prev) => (prev + 1) % bookingViews.length);
+  };
+
+  const handleInventoryCardClick = () => {
+    setInventoryViewIndex((prev) => (prev + 1) % inventoryViews.length);
+  };
+
+  const handleClientCardClick = () => {
+    setClientViewIndex((prev) => (prev + 1) % clientViews.length);
+  };
+
+  const stats = baseStats.map((stat) => {
+    if (stat.key === "revenue") {
+      const currentView = revenueViews[revenueViewIndex];
+
+      return {
+        ...stat,
+        title: currentView.title,
+        value: isRevenueHidden ? "R$ ****" : currentView.value,
+        onCardClick: handleRevenueCardClick,
+        onIconClick: handleRevenueIconClick,
+      };
+    }
+
+    if (stat.key === "bookings") {
+      const currentView = bookingViews[bookingViewIndex];
+
+      return {
+        ...stat,
+        title: currentView.title,
+        value: currentView.value,
+        onCardClick: handleBookingCardClick,
+      };
+    }
+
+    if (stat.key === "inventory") {
+      const currentView = inventoryViews[inventoryViewIndex];
+
+      return {
+        ...stat,
+        title: currentView.title,
+        value: currentView.value,
+        onCardClick: handleInventoryCardClick,
+      };
+    }
+
+    if (stat.key === "clients") {
+      const currentView = clientViews[clientViewIndex];
+
+      return {
+        ...stat,
+        title: currentView.title,
+        value: currentView.value,
+        onCardClick: handleClientCardClick,
+      };
+    }
+
+    return stat;
+  });
 
   const recentBookings = [
     { client: "João Silva", service: "Corte + Barba", time: "10:00", barber: "Miguel Santos" },
@@ -35,10 +157,25 @@ const Admin = () => {
           {/* Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {stats.map((stat, index) => (
-              <Card key={index} className="shadow-card border-border">
+              <Card
+                key={index}
+                className={`shadow-card border-border ${stat.onCardClick ? "cursor-pointer transition-transform hover:-translate-y-1" : ""}`}
+                onClick={stat.onCardClick}
+              >
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between mb-2">
-                    <stat.icon className={`h-8 w-8 ${stat.color}`} />
+                    {stat.onIconClick ? (
+                      <button
+                        type="button"
+                        onClick={stat.onIconClick}
+                        className="-m-1 rounded-full p-1 transition-colors hover:bg-primary/10"
+                        aria-label="Ocultar faturamento"
+                      >
+                        <stat.icon className={`h-8 w-8 ${stat.color}`} />
+                      </button>
+                    ) : (
+                      <stat.icon className={`h-8 w-8 ${stat.color}`} />
+                    )}
                     <TrendingUp className="h-4 w-4 text-green-500" />
                   </div>
                   <div className="text-3xl font-bold mb-1">{stat.value}</div>
@@ -85,7 +222,11 @@ const Admin = () => {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  <button className="p-6 bg-secondary hover:bg-primary/10 rounded-lg transition-all text-left border border-border hover:border-primary">
+                  <button
+                    type="button"
+                    onClick={() => navigate("/admin/agendamentos")}
+                    className="p-6 bg-secondary hover:bg-primary/10 rounded-lg transition-all text-left border border-border hover:border-primary"
+                  >
                     <Calendar className="h-8 w-8 text-primary mb-2" />
                     <div className="font-semibold">Novo Agendamento</div>
                   </button>
@@ -121,7 +262,11 @@ const Admin = () => {
                     <UserCog className="h-8 w-8 text-primary mb-2" />
                     <div className="font-semibold">Colaboradores</div>
                   </button>
-                  <button className="p-6 bg-secondary hover:bg-primary/10 rounded-lg transition-all text-left border border-border hover:border-primary">
+                  <button
+                    type="button"
+                    onClick={() => navigate("/admin/financas")}
+                    className="p-6 bg-secondary hover:bg-primary/10 rounded-lg transition-all text-left border border-border hover:border-primary"
+                  >
                     <Wallet className="h-8 w-8 text-primary mb-2" />
                     <div className="font-semibold">Finanças</div>
                   </button>

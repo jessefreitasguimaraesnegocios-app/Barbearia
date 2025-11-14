@@ -1,6 +1,7 @@
 import { hashPassword } from "@/lib/password";
 
 export type CollaboratorRole = "barbeiro" | "barbeiro-junior" | "faxineira" | "socio" | "atendente";
+export type PaymentMethod = "salario-fixo" | "aluguel-cadeira-100" | "aluguel-cadeira-50";
 
 export interface Collaborator {
   id: string;
@@ -11,6 +12,7 @@ export interface Collaborator {
   password: string;
   role: CollaboratorRole;
   specialty: string;
+  paymentMethod?: PaymentMethod;
   createdAt: string;
 }
 
@@ -24,6 +26,7 @@ export const DEFAULT_COLLABORATORS: Collaborator[] = [
     password: hashPassword("senha123"),
     role: "barbeiro",
     specialty: "Cortes clássicos e barbas",
+    paymentMethod: "aluguel-cadeira-100",
     createdAt: new Date("2024-01-05T10:00:00Z").toISOString(),
   },
   {
@@ -35,6 +38,7 @@ export const DEFAULT_COLLABORATORS: Collaborator[] = [
     password: hashPassword("barberbook"),
     role: "socio",
     specialty: "Gestão administrativa",
+    paymentMethod: "salario-fixo",
     createdAt: new Date("2024-02-01T15:30:00Z").toISOString(),
   },
 ];

@@ -31,6 +31,7 @@ const sanitizeCollaborator = (entry: Collaborator): Collaborator => ({
   ...entry,
   password: entry.password || hashPassword(entry.cpf),
   specialty: entry.specialty ?? "",
+  paymentMethod: entry.paymentMethod,
 });
 
 export const loadCollaborators = (): Collaborator[] => {
