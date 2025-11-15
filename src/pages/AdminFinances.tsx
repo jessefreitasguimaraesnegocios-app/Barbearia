@@ -11,6 +11,7 @@ import { DEFAULT_SERVICES, ServiceItem } from "@/data/services";
 import { Collaborator, PaymentMethod } from "@/data/collaborators";
 import { format, startOfMonth, endOfMonth, parseISO, isWithinInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { Expense } from "./AdminExpenses";
 
 interface AppointmentData {
   id: string;
@@ -47,6 +48,7 @@ const AdminFinances = () => {
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [allBookings, setAllBookings] = useState<BookingConfirmation[]>([]);
   const [shopSales, setShopSales] = useState<ShopSale[]>([]);
+  const [manualExpenses, setManualExpenses] = useState<Expense[]>([]);
 
   useEffect(() => {
     const nextServices = loadServices();
@@ -110,6 +112,62 @@ const AdminFinances = () => {
       }
     }
     setShopSales(allSales);
+
+    const storedExpenses = localStorage.getItem("barberbook_admin_expenses");
+    if (storedExpenses) {
+      try {
+        const parsed = JSON.parse(storedExpenses);
+        if (Array.isArray(parsed)) {
+          const now = new Date();
+          const startDate = startOfMonth(now);
+          const endDate = endOfMonth(now);
+          
+          const monthExpenses = parsed.filter((exp: Expense) => {
+            if (!exp || !exp.date) return false;
+            const expDate = parseISO(exp.date);
+            return isWithinInterval(expDate, { start: startDate, end: endDate });
+          });
+          
+          setManualExpenses(monthExpenses);
+        }
+      } catch {
+        setManualExpenses([]);
+      }
+    }
+
+    const handleStorageChange = () => {
+      const storedExpenses = localStorage.getItem("barberbook_admin_expenses");
+      if (storedExpenses) {
+        try {
+          const parsed = JSON.parse(storedExpenses);
+          if (Array.isArray(parsed)) {
+            const now = new Date();
+            const startDate = startOfMonth(now);
+            const endDate = endOfMonth(now);
+            
+            const monthExpenses = parsed.filter((exp: Expense) => {
+              if (!exp || !exp.date) return false;
+              const expDate = parseISO(exp.date);
+              return isWithinInterval(expDate, { start: startDate, end: endDate });
+            });
+            
+            setManualExpenses(monthExpenses);
+          }
+        } catch {
+          setManualExpenses([]);
+        }
+      } else {
+        setManualExpenses([]);
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("focus", handleStorageChange);
+    
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("focus", handleStorageChange);
+    };
   }, []);
 
   const getBarberIdFromCollaborator = (collaborator: Collaborator): string => {
@@ -165,9 +223,38 @@ const AdminFinances = () => {
 
   const { barbershopRevenue, shopRevenue } = useMemo(() => getMonthData(), [allBookings, services, collaborators, shopSales]);
 
-  const totalBarbershopRevenue = useMemo(() => {
+  const appointmentRevenue = useMemo(() => {
     return barbershopRevenue.reduce((sum, apt) => sum + apt.price, 0);
   }, [barbershopRevenue]);
+
+  const chairRentalRevenue = useMemo(() => {
+    let totalRental = 0;
+    
+    collaborators.forEach((collaborator) => {
+      if (collaborator.paymentMethod === "aluguel-cadeira-100" || collaborator.paymentMethod === "aluguel-cadeira-50") {
+        const barberId = collaborator.id;
+        const barberSlug = getBarberIdFromCollaborator(collaborator);
+        
+        const barberAppointments = barbershopRevenue.filter((apt) => 
+          apt.barberId === barberId || apt.barberId === barberSlug
+        );
+        
+        const barberRevenue = barberAppointments.reduce((sum, apt) => sum + apt.price, 0);
+        
+        if (collaborator.paymentMethod === "aluguel-cadeira-100") {
+          totalRental += barberRevenue;
+        } else if (collaborator.paymentMethod === "aluguel-cadeira-50") {
+          totalRental += barberRevenue * 0.5;
+        }
+      }
+    });
+    
+    return totalRental;
+  }, [collaborators, barbershopRevenue]);
+
+  const totalBarbershopRevenue = useMemo(() => {
+    return appointmentRevenue + chairRentalRevenue;
+  }, [appointmentRevenue, chairRentalRevenue]);
 
   const totalShopRevenue = useMemo(() => {
     return shopRevenue.reduce((sum, sale) => sum + sale.total, 0);
@@ -214,13 +301,38 @@ const AdminFinances = () => {
 
   const expenses = useMemo(() => calculateExpenses(), [collaborators, barbershopRevenue]);
 
+  const manualExpensesTotal = useMemo(() => {
+    const startDate = startOfMonth(new Date());
+    const endDate = endOfMonth(new Date());
+    
+    const monthExpenses = manualExpenses.filter((exp) => {
+      const expDate = parseISO(exp.date);
+      return isWithinInterval(expDate, { start: startDate, end: endDate }) && exp.type === "despesa";
+    });
+    
+    return monthExpenses.reduce((sum, exp) => sum + exp.value, 0);
+  }, [manualExpenses]);
+
+  const manualInvestmentsTotal = useMemo(() => {
+    const startDate = startOfMonth(new Date());
+    const endDate = endOfMonth(new Date());
+    
+    const monthInvestments = manualExpenses.filter((exp) => {
+      const expDate = parseISO(exp.date);
+      return isWithinInterval(expDate, { start: startDate, end: endDate }) && exp.type === "investimento";
+    });
+    
+    return monthInvestments.reduce((sum, exp) => sum + exp.value, 0);
+  }, [manualExpenses]);
+
   const totalExpenses = useMemo(() => {
-    return expenses.reduce((sum, exp) => sum + exp.amount, 0);
-  }, [expenses]);
+    const collaboratorExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+    return collaboratorExpenses + manualExpensesTotal;
+  }, [expenses, manualExpensesTotal]);
 
   const netProfit = useMemo(() => {
-    return totalBarbershopRevenue + totalShopRevenue - totalExpenses;
-  }, [totalBarbershopRevenue, totalShopRevenue, totalExpenses]);
+    return totalBarbershopRevenue + totalShopRevenue - totalExpenses - manualInvestmentsTotal;
+  }, [totalBarbershopRevenue, totalShopRevenue, totalExpenses, manualInvestmentsTotal]);
 
   const currencyFormatter = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -245,7 +357,10 @@ const AdminFinances = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card className="shadow-card border-border">
+            <Card 
+              className="shadow-card border-border cursor-pointer transition-transform hover:-translate-y-1"
+              onClick={() => navigate("/admin/financas/receita-barbearia")}
+            >
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -273,7 +388,10 @@ const AdminFinances = () => {
               </CardContent>
             </Card>
 
-            <Card className="shadow-card border-border">
+            <Card 
+              className="shadow-card border-border cursor-pointer transition-transform hover:-translate-y-1"
+              onClick={() => navigate("/admin/financas/despesas")}
+            >
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -360,7 +478,7 @@ const AdminFinances = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {expenses.length === 0 ? (
+                {expenses.length === 0 && manualExpenses.filter(e => e.type === "despesa").length === 0 ? (
                   <p className="text-center text-muted-foreground py-4">
                     Nenhuma despesa registrada
                   </p>
@@ -394,13 +512,57 @@ const AdminFinances = () => {
                         )}
                       </div>
                     ))}
-                    <div className="pt-4 border-t border-border">
+                    {manualExpenses
+                      .filter((exp) => exp.type === "despesa")
+                      .map((expense) => (
+                        <div key={expense.id} className="p-4 bg-secondary/50 rounded-lg">
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center gap-2 flex-1">
+                              <TrendingDown className="h-4 w-4 text-destructive flex-shrink-0" />
+                              <span className="font-medium text-sm">{expense.description || "Sem descrição"}</span>
+                            </div>
+                            <span className="text-lg font-bold text-destructive ml-2">
+                              {currencyFormatter.format(expense.value)}
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Despesa manual
+                          </p>
+                        </div>
+                      ))}
+                    {manualExpenses
+                      .filter((exp) => exp.type === "investimento")
+                      .map((expense) => (
+                        <div key={expense.id} className="p-4 bg-secondary/50 rounded-lg">
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center gap-2 flex-1">
+                              <TrendingUp className="h-4 w-4 text-green-500 flex-shrink-0" />
+                              <span className="font-medium text-sm">{expense.description || "Sem descrição"}</span>
+                            </div>
+                            <span className="text-lg font-bold text-green-500 ml-2">
+                              {currencyFormatter.format(expense.value)}
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Investimento
+                          </p>
+                        </div>
+                      ))}
+                    <div className="pt-4 border-t border-border space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-lg">Total de Despesas</span>
                         <span className="text-2xl font-bold text-destructive">
                           {currencyFormatter.format(totalExpenses)}
                         </span>
                       </div>
+                      {manualInvestmentsTotal > 0 && (
+                        <div className="flex items-center justify-between pt-2 border-t border-border">
+                          <span className="font-medium text-sm text-muted-foreground">Total de Investimentos</span>
+                          <span className="text-lg font-bold text-green-500">
+                            {currencyFormatter.format(manualInvestmentsTotal)}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </>
                 )}

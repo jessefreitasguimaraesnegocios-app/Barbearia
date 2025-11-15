@@ -4,7 +4,8 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, Star, Phone, Clock } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { MapPin, Star, Phone, Clock, AlertCircle } from "lucide-react";
 import { Barbershop, DEFAULT_BARBERSHOPS } from "@/data/barbershops";
 import { loadBarbershops } from "@/lib/barbershops-storage";
 
@@ -71,24 +72,34 @@ const Barbearias = () => {
                     <Clock className="h-4 w-4 text-primary mr-2" />
                     {barbershop.hours}
                   </div>
-                  <div className="flex items-center text-sm">
-                    <span
-                      className={`mr-2 h-3 w-3 rounded-full ${
-                        barbershop.isOpen ? "bg-emerald-500" : "bg-red-500"
-                      }`}
-                    />
-                    <span
-                      className={`font-semibold ${
-                        barbershop.isOpen ? "text-emerald-500" : "text-red-500"
-                      }`}
-                    >
-                      {barbershop.isOpen ? "Aberto" : "Fechado"}
-                    </span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center text-sm">
+                      <span
+                        className={`mr-2 h-3 w-3 rounded-full ${
+                          barbershop.isOpen ? "bg-emerald-500" : "bg-red-500"
+                        }`}
+                      />
+                      <span
+                        className={`font-semibold ${
+                          barbershop.isOpen ? "text-emerald-500" : "text-red-500"
+                        }`}
+                      >
+                        {barbershop.isOpen ? "Aberto" : "Fechado"}
+                      </span>
+                    </div>
+                    {barbershop.status === "indisponivel" && (
+                      <Badge variant="destructive" className="flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        Indisponível
+                      </Badge>
+                    )}
                   </div>
                   <Button
                     variant="hero"
                     className="w-full"
+                    disabled={barbershop.status === "indisponivel"}
                     onClick={() => {
+                      if (barbershop.status === "indisponivel") return;
                       localStorage.setItem(
                         "selectedBarbershop",
                         JSON.stringify({
@@ -100,7 +111,7 @@ const Barbearias = () => {
                       navigate("/services");
                     }}
                   >
-                    Selecionar Barbearia
+                    {barbershop.status === "indisponivel" ? "Indisponível" : "Selecionar Barbearia"}
                   </Button>
                 </CardContent>
               </Card>

@@ -1,4 +1,5 @@
-import { Barbershop, DEFAULT_BARBERSHOPS } from "@/data/barbershops";
+import { Barbershop, DEFAULT_BARBERSHOPS, BarbershopStatus } from "@/data/barbershops";
+import { differenceInDays, parseISO, isAfter, addDays } from "date-fns";
 
 const STORAGE_KEY = "barberbook_admin_barbershops";
 
@@ -22,7 +23,10 @@ const isValidBarbershop = (entry: unknown): entry is Barbershop => {
     typeof typed.phone === "string" &&
     typeof typed.hours === "string" &&
     typeof typed.isOpen === "boolean" &&
-    typeof typed.email === "string"
+    typeof typed.email === "string" &&
+    (typed.status === undefined || typed.status === "disponivel" || typed.status === "indisponivel") &&
+    (typed.dataPagamento === undefined || typeof typed.dataPagamento === "string") &&
+    (typed.dataVencimento === undefined || typeof typed.dataVencimento === "string")
   );
 };
 
@@ -30,6 +34,45 @@ const sanitizeBarbershop = (entry: Barbershop): Barbershop => ({
   ...entry,
   rating: Number(entry.rating.toFixed(1)),
 });
+
+export const checkPaymentStatus = (barbershop: Barbershop): Barbershop | null => {
+  if (!barbershop.dataVencimento) {
+    return { ...barbershop, status: barbershop.status || "disponivel" };
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const vencimento = parseISO(barbershop.dataVencimento);
+  vencimento.setHours(0, 0, 0, 0);
+  
+  const diasAtraso = differenceInDays(today, vencimento);
+
+  if (diasAtraso > 3) {
+    return null;
+  }
+
+  if (diasAtraso >= 0) {
+    if (!barbershop.dataPagamento) {
+      return { ...barbershop, status: "indisponivel" };
+    }
+    
+    const dataPagamento = parseISO(barbershop.dataPagamento);
+    dataPagamento.setHours(0, 0, 0, 0);
+    
+    if (isAfter(dataPagamento, vencimento) || dataPagamento.getTime() >= vencimento.getTime()) {
+      const proximoVencimento = addDays(dataPagamento, 30);
+      return {
+        ...barbershop,
+        status: "disponivel",
+        dataVencimento: proximoVencimento.toISOString().split("T")[0],
+      };
+    } else {
+      return { ...barbershop, status: "indisponivel" };
+    }
+  }
+
+  return { ...barbershop, status: barbershop.status || "disponivel" };
+};
 
 export const loadBarbershops = (): Barbershop[] => {
   if (typeof window === "undefined") {
@@ -49,12 +92,17 @@ export const loadBarbershops = (): Barbershop[] => {
       return DEFAULT_BARBERSHOPS;
     }
 
-    const validBarbershops = parsed.filter(isValidBarbershop).map(sanitizeBarbershop);
+    const validBarbershops = parsed
+      .filter(isValidBarbershop)
+      .map(sanitizeBarbershop)
+      .map(checkPaymentStatus)
+      .filter((bs): bs is Barbershop => bs !== null);
 
     if (!validBarbershops.length) {
       return DEFAULT_BARBERSHOPS;
     }
 
+    persistBarbershops(validBarbershops);
     return validBarbershops;
   } catch {
     return DEFAULT_BARBERSHOPS;

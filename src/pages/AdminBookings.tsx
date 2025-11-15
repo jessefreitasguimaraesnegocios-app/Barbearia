@@ -4,7 +4,9 @@ import { Navbar } from "@/components/Navbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Calendar, Clock, User, DollarSign, Filter } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import { ArrowLeft, Calendar, Clock, User, DollarSign, Filter, Copy } from "lucide-react";
 import { loadServices } from "@/lib/services-storage";
 import { loadCollaborators } from "@/lib/collaborators-storage";
 import { DEFAULT_SERVICES, ServiceItem } from "@/data/services";
@@ -36,11 +38,23 @@ type PeriodFilter = "day" | "week" | "month";
 
 const AdminBookings = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [services, setServices] = useState<ServiceItem[]>(DEFAULT_SERVICES);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [allBookings, setAllBookings] = useState<BookingConfirmation[]>([]);
   const [isRevenueHidden, setIsRevenueHidden] = useState(false);
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("month");
+  const [selectedAppointment, setSelectedAppointment] = useState<{
+    apt: AppointmentData & { 
+      clientName: string; 
+      serviceName: string; 
+      barberName: string;
+      price: number;
+      dateObj: Date;
+      bookingPayment: { fullName: string; phone: string; cpf: string };
+    };
+    payment: { fullName: string; phone: string; cpf: string };
+  } | null>(null);
 
   useEffect(() => {
     const nextServices = loadServices();
@@ -107,6 +121,7 @@ const AdminBookings = () => {
       barberName: string;
       price: number;
       dateObj: Date;
+      bookingPayment: { fullName: string; phone: string; cpf: string };
     }> = [];
     
     allBookings.forEach((booking) => {
@@ -137,6 +152,7 @@ const AdminBookings = () => {
               barberName: collaborator?.name || apt.barberId,
               price,
               dateObj: aptDate,
+              bookingPayment: booking.payment,
             });
           }
         }
@@ -202,6 +218,80 @@ const AdminBookings = () => {
   };
 
   const currencyFormatter = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+
+  const copyToClipboard = (text: string) => {
+    if (!text || text.trim() === "") {
+      toast({
+        title: "Erro",
+        description: "Nenhum texto para copiar",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const isHTTPS = window.location.protocol === "https:";
+    const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+    const hasClipboardAPI = isHTTPS || isLocalhost;
+    
+    if (hasClipboardAPI && navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        toast({
+          title: "Copiado",
+          description: "Texto copiado para a área de transferência",
+        });
+      }).catch(() => {
+        copyWithFallback(text);
+      });
+      return;
+    }
+
+    copyWithFallback(text);
+
+    function copyWithFallback(textToCopy: string) {
+      const textArea = document.createElement("textarea");
+      textArea.value = textToCopy;
+      textArea.style.position = "fixed";
+      textArea.style.opacity = "0";
+      textArea.style.left = "0";
+      textArea.style.top = "0";
+      textArea.style.width = "2em";
+      textArea.style.height = "2em";
+      textArea.style.padding = "0";
+      textArea.style.border = "none";
+      textArea.style.outline = "none";
+      textArea.style.boxShadow = "none";
+      textArea.style.background = "transparent";
+      textArea.setAttribute("readonly", "");
+      
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      textArea.setSelectionRange(0, 999999);
+      
+      try {
+        const successful = document.execCommand("copy");
+        document.body.removeChild(textArea);
+        
+        if (successful) {
+          toast({
+            title: "Copiado",
+            description: "Texto copiado para a área de transferência",
+          });
+        } else {
+          throw new Error("Copy command returned false");
+        }
+      } catch (err) {
+        if (document.body.contains(textArea)) {
+          document.body.removeChild(textArea);
+        }
+        toast({
+          title: "Erro",
+          description: "Não foi possível copiar o texto. Tente selecionar e copiar manualmente.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -306,7 +396,8 @@ const AdminBookings = () => {
                       {appointments.map((apt) => (
                         <div
                           key={apt.id}
-                          className="p-4 border border-border rounded-lg hover:bg-secondary/50 transition-colors"
+                          onClick={() => setSelectedAppointment({ apt, payment: apt.bookingPayment })}
+                          className="p-4 border border-border rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
                         >
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
@@ -344,6 +435,66 @@ const AdminBookings = () => {
           </div>
         </div>
       </main>
+
+      <Dialog open={!!selectedAppointment} onOpenChange={(open) => !open && setSelectedAppointment(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Informações do Cliente</DialogTitle>
+            <DialogDescription>
+              Dados do cliente para o agendamento de {selectedAppointment?.apt.serviceName}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedAppointment && (
+            <div className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">Nome Completo</label>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-base font-semibold flex-1">{selectedAppointment.payment.fullName}</p>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => copyToClipboard(selectedAppointment.payment.fullName)}
+                    aria-label="Copiar nome completo"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">Número de Telefone</label>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-base font-semibold flex-1">{selectedAppointment.payment.phone}</p>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => copyToClipboard(selectedAppointment.payment.phone)}
+                    aria-label="Copiar telefone"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">CPF</label>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-base font-semibold flex-1">{selectedAppointment.payment.cpf}</p>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => copyToClipboard(selectedAppointment.payment.cpf)}
+                    aria-label="Copiar CPF"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -1,3 +1,5 @@
+export type BarbershopStatus = "disponivel" | "indisponivel";
+
 export interface Barbershop {
   id: string;
   name: string;
@@ -7,6 +9,9 @@ export interface Barbershop {
   hours: string;
   isOpen: boolean;
   email: string;
+  status?: BarbershopStatus;
+  dataPagamento?: string;
+  dataVencimento?: string;
 }
 
 export const DEFAULT_BARBERSHOPS: Barbershop[] = [
@@ -19,6 +24,7 @@ export const DEFAULT_BARBERSHOPS: Barbershop[] = [
     hours: "Seg à Sáb • 09h às 21h",
     isOpen: true,
     email: "premium.center@barberbook.com",
+    status: "disponivel",
   },
   {
     id: "2",
@@ -29,6 +35,7 @@ export const DEFAULT_BARBERSHOPS: Barbershop[] = [
     hours: "Seg à Sáb • 10h às 20h",
     isOpen: true,
     email: "elite.jardins@barberbook.com",
+    status: "disponivel",
   },
   {
     id: "3",
@@ -39,6 +46,7 @@ export const DEFAULT_BARBERSHOPS: Barbershop[] = [
     hours: "Seg à Dom • 08h às 22h",
     isOpen: true,
     email: "studio.moema@barberbook.com",
+    status: "disponivel",
   },
   {
     id: "4",
@@ -49,6 +57,7 @@ export const DEFAULT_BARBERSHOPS: Barbershop[] = [
     hours: "Seg à Sáb • 09h às 19h",
     isOpen: false,
     email: "clube.alphaville@barberbook.com",
+    status: "disponivel",
   },
   {
     id: "5",
@@ -59,6 +68,7 @@ export const DEFAULT_BARBERSHOPS: Barbershop[] = [
     hours: "Seg à Dom • 08h às 21h",
     isOpen: true,
     email: "vila.olimpia@barberbook.com",
+    status: "disponivel",
   },
   {
     id: "6",
@@ -69,6 +79,7 @@ export const DEFAULT_BARBERSHOPS: Barbershop[] = [
     hours: "Seg à Sáb • 09h às 20h",
     isOpen: true,
     email: "concept.pinheiros@barberbook.com",
+    status: "disponivel",
   },
 ];
 

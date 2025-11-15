@@ -23,6 +23,8 @@ import CollaboratorDetails from "./pages/CollaboratorDetails";
 import AdminVip from "./pages/AdminVip";
 import AdminInventory from "./pages/AdminInventory";
 import AdminShop from "./pages/AdminShop";
+import AdminExpenses from "./pages/AdminExpenses";
+import AdminBarbershopRevenue from "./pages/AdminBarbershopRevenue";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -47,6 +49,8 @@ const App = () => (
               <Route path="/admin" element={<Admin />} />
               <Route path="/admin/agendamentos" element={<AdminBookings />} />
               <Route path="/admin/financas" element={<AdminFinances />} />
+              <Route path="/admin/financas/despesas" element={<AdminExpenses />} />
+              <Route path="/admin/financas/receita-barbearia" element={<AdminBarbershopRevenue />} />
               <Route path="/admin/servicos" element={<AdminServices />} />
               <Route path="/admin/perfil" element={<AdminProfile />} />
               <Route path="/admin/colaboradores" element={<AdminCollaborators />} />

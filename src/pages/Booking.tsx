@@ -4,7 +4,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Calendar as CalendarIcon, Clock, User, Check, X } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, User, Check, X, Trash2 } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import type { Matcher } from "react-day-picker";
 import { addDays, isBefore, isSameDay, parseISO, startOfToday } from "date-fns";
@@ -155,6 +155,94 @@ const Booking = () => {
     return hasDiscount
       ? calculateDiscountedPrice(service.price, service.discountPercentage!)
       : service.price;
+  };
+
+  const parseDurationToMinutes = (duration: string): number => {
+    const match = duration.match(/(\d+)\s*(?:min|minutos?|m)?/i);
+    return match ? parseInt(match[1], 10) : 0;
+  };
+
+  const getTotalDuration = (): number => {
+    let totalMinutes = 0;
+    selectedServices.forEach((serviceId) => {
+      const service = services.find((s) => s.id === serviceId);
+      if (service) {
+        totalMinutes += parseDurationToMinutes(service.duration);
+      }
+    });
+    return totalMinutes;
+  };
+
+  const formatTotalDuration = (minutes: number): string => {
+    if (minutes === 0) return "0 min";
+    if (minutes < 60) return `${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    if (remainingMinutes === 0) return `${hours} ${hours === 1 ? "hora" : "horas"}`;
+    return `${hours} ${hours === 1 ? "hora" : "horas"} e ${remainingMinutes} min`;
+  };
+
+  const getTimeSlotIndex = (time: string): number => {
+    return timeSlots.indexOf(time);
+  };
+
+  const getNextTimeSlot = (time: string): string | null => {
+    const currentIndex = getTimeSlotIndex(time);
+    if (currentIndex === -1 || currentIndex >= timeSlots.length - 1) return null;
+    return timeSlots[currentIndex + 1];
+  };
+
+  const getUnassignedServicesDuration = (): number => {
+    const unassigned = getUnassignedServices();
+    let totalMinutes = 0;
+    unassigned.forEach((serviceId) => {
+      const service = services.find((s) => s.id === serviceId);
+      if (service) {
+        totalMinutes += parseDurationToMinutes(service.duration);
+      }
+    });
+    return totalMinutes;
+  };
+
+  const getRequiredSlotsForUnassignedServices = (): number => {
+    const totalMinutes = getUnassignedServicesDuration();
+    return Math.ceil(totalMinutes / 30);
+  };
+
+  const findSequentialSlots = (startTime: string, availableTimes: string[], requiredSlots: number): string[] => {
+    const slots: string[] = [];
+    let currentTime = startTime;
+    let currentIndex = getTimeSlotIndex(startTime);
+
+    for (let i = 0; i < requiredSlots && currentTime && availableTimes.includes(currentTime); i++) {
+      slots.push(currentTime);
+      currentTime = getNextTimeSlot(currentTime);
+    }
+
+    return slots.length === requiredSlots ? slots : [];
+  };
+
+  const createSequentialAppointments = (barberId: string, date: Date, startTime: string): void => {
+    const unassigned = getUnassignedServices();
+    if (unassigned.length === 0) return;
+
+    const availableTimes = getAvailableTimesForBarber(barberId, date);
+    const requiredSlots = getRequiredSlotsForUnassignedServices();
+    const sequentialSlots = findSequentialSlots(startTime, availableTimes, requiredSlots);
+
+    if (sequentialSlots.length === requiredSlots) {
+      let slotIndex = 0;
+      unassigned.forEach((serviceId) => {
+        const service = services.find((s) => s.id === serviceId);
+        if (service && slotIndex < sequentialSlots.length) {
+          const serviceSlots = Math.ceil(parseDurationToMinutes(service.duration) / 30);
+          const appointmentTime = sequentialSlots[slotIndex];
+          
+          addAppointment(serviceId, barberId, date, appointmentTime);
+          slotIndex += serviceSlots;
+        }
+      });
+    }
   };
 
   useEffect(() => {
@@ -469,14 +557,24 @@ const Booking = () => {
                                       e.stopPropagation();
                                       handleRemoveService(service.id);
                                     }}
-                                    className="text-destructive hover:text-destructive/80 text-sm font-medium"
+                                    className="text-destructive hover:text-destructive/80 p-1 rounded transition-colors"
+                                    aria-label={`Remover ${service.title}`}
                                   >
-                                    Remover
+                                    <Trash2 className="h-4 w-4" />
                                   </button>
                                 </div>
                               </div>
                             );
                           })}
+                        <div className="flex items-center justify-between p-2 bg-primary/5 rounded border border-primary/20 mt-3">
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-4 w-4 text-primary" />
+                            <span className="font-semibold text-sm">Tempo Total:</span>
+                          </div>
+                          <span className="text-sm font-semibold text-primary">
+                            {formatTotalDuration(getTotalDuration())}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -491,21 +589,33 @@ const Booking = () => {
                         ? calculateDiscountedPrice(service.price, service.discountPercentage!)
                         : service.price;
                       const count = getServiceCount(service.id);
+                      const isSelected = count > 0;
 
                       return (
                         <button
                           key={service.id}
                           onClick={() => handleAddService(service.id)}
-                          className="p-6 rounded-lg border-2 text-left transition-all border-border hover:border-primary/50"
+                          className={`p-6 rounded-lg border-2 text-left transition-all ${
+                            isSelected
+                              ? "border-primary bg-primary/5 shadow-gold"
+                              : "border-border hover:border-primary/50"
+                          }`}
                         >
-                          <div className="flex items-center justify-between mb-2">
-                            <h3 className="font-semibold text-lg">{service.title}</h3>
-                            <div className="flex items-center gap-2">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h3 className="font-semibold text-lg">{service.title}</h3>
+                                {isSelected && (
+                                  <Check className="h-5 w-5 text-primary flex-shrink-0" />
+                                )}
+                              </div>
                               {count > 0 && (
-                                <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded font-semibold">
+                                <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded font-semibold inline-block">
                                   {count}x selecionado{count > 1 ? "s" : ""}
                                 </span>
                               )}
+                            </div>
+                            <div className="flex items-center gap-2">
                               {service.promotionScope === "vip" && (
                                 <span className="text-xs font-semibold uppercase tracking-wide text-primary">
                                   VIP
@@ -671,10 +781,13 @@ const Booking = () => {
 
                         return (
                           <div className="space-y-4 p-4 border border-border rounded-lg">
-                            <div>
-                              <h4 className="font-semibold mb-2 text-sm">
-                                Agendando: <span className="text-primary">{currentService.title}</span>
-                              </h4>
+                            <div className="text-center p-6 rounded-lg bg-primary/10 border border-primary/20 shadow-gold mb-4">
+                              <p className="text-xs text-muted-foreground mb-2 uppercase tracking-wide font-medium">
+                                Agendando
+                              </p>
+                              <h3 className="text-2xl md:text-3xl font-display font-bold text-primary">
+                                {currentService.title}
+                              </h3>
                             </div>
 
                             <div>
@@ -709,7 +822,7 @@ const Booking = () => {
                             {tempBarberId && (
                               <>
                                 <div>
-                                  <label className="text-sm font-medium mb-2 block">Selecione a Data:</label>
+                                  <label className="text-sm font-medium mb-4 block">Selecione a Data:</label>
                                   <div className="flex justify-center">
                                     <Calendar
                                       mode="single"
@@ -721,11 +834,32 @@ const Booking = () => {
                                         }
                                       }}
                                       fromDate={startOfToday()}
+                                      toDate={addDays(startOfToday(), 30)}
                                       disabled={(date) => {
-                                        if (isBefore(date, startOfToday())) return true;
+                                        const today = startOfToday();
+                                        const maxDate = addDays(today, 30);
+                                        if (isBefore(date, today)) return true;
+                                        if (isBefore(maxDate, date)) return true;
                                         return !selectedBarberDates.some((d) => isSameDay(d, date));
                                       }}
-                                      className="w-full rounded-lg border border-border bg-card p-4"
+                                      className="w-full max-w-md mx-auto rounded-lg border border-border bg-card p-6"
+                                      classNames={{
+                                        months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
+                                        month: "space-y-4",
+                                        caption: "flex justify-center pt-1 relative items-center",
+                                        caption_label: "text-base font-semibold",
+                                        nav: "space-x-1 flex items-center",
+                                        table: "w-full border-collapse space-y-1",
+                                        head_row: "flex",
+                                        head_cell: "text-muted-foreground rounded-md w-12 font-normal text-sm",
+                                        row: "flex w-full mt-2",
+                                        cell: "h-12 w-12 text-center text-sm p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-accent/50 [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
+                                        day: "h-12 w-12 p-0 font-normal text-base aria-selected:opacity-100",
+                                        day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
+                                        day_today: "bg-accent text-accent-foreground font-semibold",
+                                        day_outside: "text-muted-foreground opacity-30",
+                                        day_disabled: "text-muted-foreground opacity-30 cursor-not-allowed",
+                                      }}
                                     />
                                   </div>
                                 </div>
@@ -733,34 +867,78 @@ const Booking = () => {
                                 {currentDate && (
                                   <div>
                                     <label className="text-sm font-medium mb-2 block">Selecione o Horário:</label>
-                                    <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
-                                      {timeSlots.map((time) => {
-                                        const isAvailable = selectedBarberTimes.includes(time);
-                                        const isSelected = tempTime === time;
-                                        
-                                        return (
-                                          <button
-                                            key={time}
-                                            type="button"
-                                            disabled={!isAvailable}
-                                            onClick={() => {
-                                              if (isAvailable) {
-                                                setTempTime(time);
+                                    {(() => {
+                                      const unassigned = getUnassignedServices();
+                                      const requiredSlots = getRequiredSlotsForUnassignedServices();
+                                      
+                                      return (
+                                        <>
+                                          {unassigned.length > 1 && (
+                                            <p className="text-xs text-muted-foreground mb-2">
+                                              Selecionando um horário, serão agendados {unassigned.length} serviços sequencialmente ({formatTotalDuration(getUnassignedServicesDuration())})
+                                            </p>
+                                          )}
+                                          <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
+                                            {timeSlots.map((time) => {
+                                              const isAvailable = selectedBarberTimes.includes(time);
+                                              const isSelected = tempTime === time;
+                                              
+                                              let willBeSequentiallySelected = false;
+                                              if (isAvailable && unassigned.length > 1 && tempTime) {
+                                                const requiredSlotsForAll = getRequiredSlotsForUnassignedServices();
+                                                const sequentialSlots = findSequentialSlots(tempTime, selectedBarberTimes, requiredSlotsForAll);
+                                                willBeSequentiallySelected = sequentialSlots.includes(time) && time !== tempTime;
                                               }
-                                            }}
-                                            className={`p-2 rounded-lg border text-center text-sm transition-all ${
-                                              isSelected
-                                                ? "border-primary bg-primary/10 text-primary font-semibold"
-                                                : !isAvailable
-                                                  ? "border-border/60 bg-secondary text-muted-foreground opacity-60 cursor-not-allowed"
-                                                  : "border-border hover:border-primary hover:bg-primary/5"
-                                            }`}
-                                          >
-                                            {time}
-                                          </button>
-                                        );
-                                      })}
-                                    </div>
+                                              
+                                              return (
+                                                <button
+                                                  key={time}
+                                                  type="button"
+                                                  disabled={!isAvailable}
+                                                  onClick={() => {
+                                                    if (isAvailable && tempBarberId && currentDate) {
+                                                      if (unassigned.length > 1) {
+                                                        const availableTimes = getAvailableTimesForBarber(tempBarberId, currentDate);
+                                                        const requiredSlotsForAll = getRequiredSlotsForUnassignedServices();
+                                                        const sequentialSlots = findSequentialSlots(time, availableTimes, requiredSlotsForAll);
+                                                        
+                                                        if (sequentialSlots.length === requiredSlotsForAll) {
+                                                          createSequentialAppointments(tempBarberId, currentDate, time);
+                                                          setTempBarberId("");
+                                                          setTempTime("");
+                                                          const nextUnassigned = getUnassignedServices();
+                                                          if (nextUnassigned.length > 0) {
+                                                            const dates = getAllAvailableDates;
+                                                            if (dates.length > 0) {
+                                                              setCurrentDate(dates[0]);
+                                                            }
+                                                          }
+                                                        } else {
+                                                          setTempTime(time);
+                                                        }
+                                                      } else {
+                                                        setTempTime(time);
+                                                      }
+                                                    }
+                                                  }}
+                                                  className={`p-2 rounded-lg border text-center text-sm transition-all ${
+                                                    isSelected
+                                                      ? "border-primary bg-primary/10 text-primary font-semibold"
+                                                      : willBeSequentiallySelected
+                                                        ? "border-primary/50 bg-primary/5 text-primary font-medium"
+                                                        : !isAvailable
+                                                          ? "border-border/60 bg-secondary text-muted-foreground opacity-60 cursor-not-allowed"
+                                                          : "border-border hover:border-primary hover:bg-primary/5"
+                                                  }`}
+                                                >
+                                                  {time}
+                                                </button>
+                                              );
+                                            })}
+                                          </div>
+                                        </>
+                                      );
+                                    })()}
                                   </div>
                                 )}
 
@@ -769,21 +947,50 @@ const Booking = () => {
                                     variant="hero"
                                     className="w-full"
                                     onClick={() => {
-                                      if (tempBarberId && currentDate && tempTime && currentServiceId) {
-                                        addAppointment(currentServiceId, tempBarberId, currentDate, tempTime);
-                                        setTempBarberId("");
-                                        setTempTime("");
-                                        const nextUnassigned = getUnassignedServices().filter((id) => id !== currentServiceId);
-                                        if (nextUnassigned.length > 0) {
-                                          const dates = getAllAvailableDates;
-                                          if (dates.length > 0) {
-                                            setCurrentDate(dates[0]);
+                                      const unassigned = getUnassignedServices();
+                                      
+                                      if (unassigned.length > 1 && tempBarberId && currentDate) {
+                                        const availableTimes = getAvailableTimesForBarber(tempBarberId, currentDate);
+                                        const requiredSlotsForAll = getRequiredSlotsForUnassignedServices();
+                                        const sequentialSlots = findSequentialSlots(tempTime, availableTimes, requiredSlotsForAll);
+                                        
+                                        if (sequentialSlots.length === requiredSlotsForAll) {
+                                          createSequentialAppointments(tempBarberId, currentDate, tempTime);
+                                        } else {
+                                          if (currentServiceId) {
+                                            addAppointment(currentServiceId, tempBarberId, currentDate, tempTime);
                                           }
+                                        }
+                                      } else {
+                                        if (tempBarberId && currentDate && tempTime && currentServiceId) {
+                                          addAppointment(currentServiceId, tempBarberId, currentDate, tempTime);
+                                        }
+                                      }
+                                      
+                                      setTempBarberId("");
+                                      setTempTime("");
+                                      const nextUnassigned = getUnassignedServices();
+                                      if (nextUnassigned.length > 0) {
+                                        const dates = getAllAvailableDates;
+                                        if (dates.length > 0) {
+                                          setCurrentDate(dates[0]);
                                         }
                                       }
                                     }}
                                   >
-                                    Confirmar Agendamento
+                                    {(() => {
+                                      const unassigned = getUnassignedServices();
+                                      if (unassigned.length > 1 && tempTime && tempBarberId && currentDate) {
+                                        const availableTimes = getAvailableTimesForBarber(tempBarberId, currentDate);
+                                        const requiredSlotsForAll = getRequiredSlotsForUnassignedServices();
+                                        const sequentialSlots = findSequentialSlots(tempTime, availableTimes, requiredSlotsForAll);
+                                        
+                                        if (sequentialSlots.length === requiredSlotsForAll) {
+                                          return `Agendar ${unassigned.length} Serviços Sequencialmente`;
+                                        }
+                                      }
+                                      return "Confirmar Agendamento";
+                                    })()}
                                   </Button>
                                 )}
                               </>

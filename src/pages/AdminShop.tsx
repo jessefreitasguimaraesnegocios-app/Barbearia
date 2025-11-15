@@ -8,8 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DEFAULT_INVENTORY, InventoryData, StoreProduct } from "@/data/inventory";
 import { loadInventory, persistInventory, resetInventory } from "@/lib/inventory-storage";
+import { loadBarbershops } from "@/lib/barbershops-storage";
 import { useToast } from "@/components/ui/use-toast";
 import { ArrowLeft, ImageIcon, RefreshCcw, ShoppingCart, ShoppingBag, Star, Trash2, Plus, Sparkles } from "lucide-react";
 
@@ -21,9 +23,17 @@ interface ProductFormState {
   rating: string;
   price: string;
   vipPromotionLabel: string;
+  category: "produtos" | "consumo" | "bebidas" | "";
 }
 
 const PLACEHOLDER_IMAGE = "/placeholder.svg";
+
+const generateUUID = (): string => {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).substring(2, 15)}-${Math.random().toString(36).substring(2, 15)}`;
+};
 
 const INITIAL_PRODUCT_FORM: ProductFormState = {
   name: "",
@@ -33,7 +43,10 @@ const INITIAL_PRODUCT_FORM: ProductFormState = {
   rating: "4.5",
   price: "0",
   vipPromotionLabel: "",
+  category: "",
 };
+
+type CategoryFilter = "produtos" | "consumo" | "bebidas";
 
 const AdminShop = () => {
   const navigate = useNavigate();
@@ -42,6 +55,8 @@ const AdminShop = () => {
   const [storefrontForm, setStorefrontForm] = useState(DEFAULT_INVENTORY.storefront);
   const [activeProductId, setActiveProductId] = useState<string | null>(DEFAULT_INVENTORY.storeProducts[0]?.id ?? null);
   const [productForm, setProductForm] = useState<ProductFormState>(INITIAL_PRODUCT_FORM);
+  const [previewCategory, setPreviewCategory] = useState<CategoryFilter>("produtos");
+  const [activeBarbershopId, setActiveBarbershopId] = useState<string | null>(null);
   const initializedRef = useRef(false);
 
   const currencyFormatter = useMemo(
@@ -50,19 +65,44 @@ const AdminShop = () => {
   );
 
   useEffect(() => {
-    const data = loadInventory();
-    setInventory(data);
-    setStorefrontForm(data.storefront);
-    setActiveProductId(data.storeProducts[0]?.id ?? null);
-    initializedRef.current = true;
+    const loadData = () => {
+      const barbershops = loadBarbershops();
+      const activeId = barbershops[0]?.id ?? null;
+      setActiveBarbershopId(activeId);
+      
+      const storedActiveId = localStorage.getItem("admin_active_barbershop_id");
+      const barbershopId = storedActiveId || activeId;
+      
+      const data = loadInventory(barbershopId);
+      setInventory(data);
+      setStorefrontForm(data.storefront);
+      setActiveProductId(data.storeProducts[0]?.id ?? null);
+      initializedRef.current = true;
+    };
+    
+    loadData();
+    
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === "admin_active_barbershop_id") {
+        loadData();
+      }
+    };
+    
+    window.addEventListener("storage", handleStorageChange);
+    
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+    };
   }, []);
 
   useEffect(() => {
     if (!initializedRef.current) {
       return;
     }
-    persistInventory(inventory);
-  }, [inventory]);
+    const storedActiveId = localStorage.getItem("admin_active_barbershop_id");
+    const barbershopId = storedActiveId || activeBarbershopId;
+    persistInventory(inventory, barbershopId);
+  }, [inventory, activeBarbershopId]);
 
   const activeProduct = useMemo(
     () => inventory.storeProducts.find((product) => product.id === activeProductId) ?? null,
@@ -79,9 +119,8 @@ const AdminShop = () => {
         rating: activeProduct.rating.toString(),
         price: activeProduct.price.toString().replace(".", ","),
         vipPromotionLabel: activeProduct.vipPromotionLabel,
+        category: activeProduct.category || "",
       });
-    } else {
-      setProductForm(INITIAL_PRODUCT_FORM);
     }
   }, [activeProduct]);
 
@@ -185,13 +224,22 @@ const AdminShop = () => {
       return;
     }
 
+    if (!productForm.category) {
+      toast({
+        variant: "destructive",
+        title: "Categoria obrigatória",
+        description: "Selecione uma categoria para o produto.",
+      });
+      return;
+    }
+
     const numericRating = Number(productForm.rating);
     const numericPrice = parseCurrency(productForm.price);
 
     const baseProduct: StoreProduct =
       activeProduct ??
       {
-        id: crypto.randomUUID(),
+        id: generateUUID(),
         name: "",
         description: "",
         imageUrl: "",
@@ -212,6 +260,7 @@ const AdminShop = () => {
       rating: Number.isNaN(numericRating) ? baseProduct.rating : Math.min(Math.max(numericRating, 0), 5),
       price: Number.isNaN(numericPrice) ? baseProduct.price : Number(numericPrice.toFixed(2)),
       vipPromotionLabel: productForm.vipPromotionLabel.trim(),
+      category: productForm.category as "produtos" | "consumo" | "bebidas",
     };
 
     setInventory((previous) => {
@@ -259,12 +308,17 @@ const AdminShop = () => {
 
   const addNewProduct = () => {
     setActiveProductId(null);
-    setProductForm(INITIAL_PRODUCT_FORM);
+    setProductForm({
+      ...INITIAL_PRODUCT_FORM,
+      category: "produtos",
+    });
   };
 
   const handleResetShop = () => {
-    resetInventory();
-    const data = loadInventory();
+    const storedActiveId = localStorage.getItem("admin_active_barbershop_id");
+    const barbershopId = storedActiveId || activeBarbershopId;
+    resetInventory(barbershopId);
+    const data = loadInventory(barbershopId);
     setInventory(data);
     setStorefrontForm(data.storefront);
     setActiveProductId(data.storeProducts[0]?.id ?? null);
@@ -274,7 +328,9 @@ const AdminShop = () => {
     });
   };
 
-  const previewProducts = useMemo(() => inventory.storeProducts, [inventory.storeProducts]);
+  const previewProducts = useMemo(() => {
+    return inventory.storeProducts.filter((product) => product.category === previewCategory);
+  }, [inventory.storeProducts, previewCategory]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -352,7 +408,33 @@ const AdminShop = () => {
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Category Filters */}
+              <div className="flex flex-wrap justify-center gap-4 mb-12">
+                <Button
+                  variant={previewCategory === "produtos" ? "hero" : "outline"}
+                  onClick={() => setPreviewCategory("produtos")}
+                  className="min-w-[120px]"
+                >
+                  Produtos
+                </Button>
+                <Button
+                  variant={previewCategory === "consumo" ? "hero" : "outline"}
+                  onClick={() => setPreviewCategory("consumo")}
+                  className="min-w-[120px]"
+                >
+                  Consumo
+                </Button>
+                <Button
+                  variant={previewCategory === "bebidas" ? "hero" : "outline"}
+                  onClick={() => setPreviewCategory("bebidas")}
+                  className="min-w-[120px]"
+                >
+                  Bebidas
+                </Button>
+              </div>
+
+              {previewProducts.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {previewProducts.map((product) => (
                   <Card
                     key={product.id}
@@ -393,7 +475,14 @@ const AdminShop = () => {
                     </CardContent>
                   </Card>
                 ))}
-              </div>
+                </div>
+              ) : (
+                <div className="text-center py-16">
+                  <p className="text-xl text-muted-foreground">
+                    Nenhum produto encontrado nesta categoria.
+                  </p>
+                </div>
+              )}
 
               <Card className="mt-8 border-dashed border-primary/40 bg-secondary/30">
                 <CardContent className="p-6 text-center">
@@ -512,10 +601,34 @@ const AdminShop = () => {
 
     <Card className="shadow-card border-border xl:col-span-1">
       <CardHeader>
-        <CardTitle>{activeProduct ? "Editar produto" : "Novo produto"}</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle>{activeProduct ? "Editar produto" : "Novo produto"}</CardTitle>
+          <Button variant="secondary" size="sm" onClick={addNewProduct}>
+            <Plus className="mr-2 h-4 w-4" />
+            Novo produto
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <form className="space-y-5" onSubmit={upsertProduct}>
+          <div className="space-y-2">
+            <Label htmlFor="product-category">Categoria *</Label>
+            <Select
+              value={productForm.category}
+              onValueChange={(value) => handleProductFormChange("category", value as "produtos" | "consumo" | "bebidas" | "")}
+              required
+            >
+              <SelectTrigger id="product-category">
+                <SelectValue placeholder="Selecione uma categoria" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="produtos">Produtos</SelectItem>
+                <SelectItem value="consumo">Consumo</SelectItem>
+                <SelectItem value="bebidas">Bebidas</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="product-name">Nome</Label>
             <Input

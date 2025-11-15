@@ -228,7 +228,7 @@ const Admin = () => {
                     className="p-6 bg-secondary hover:bg-primary/10 rounded-lg transition-all text-left border border-border hover:border-primary"
                   >
                     <Calendar className="h-8 w-8 text-primary mb-2" />
-                    <div className="font-semibold">Novo Agendamento</div>
+                    <div className="font-semibold">Pré-Agendados</div>
                   </button>
                   <button
                     type="button"

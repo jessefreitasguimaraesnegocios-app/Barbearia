@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/components/ui/use-toast";
@@ -14,17 +15,31 @@ import { Barbershop, DEFAULT_BARBERSHOPS } from "@/data/barbershops";
 import { loadBarbershops, persistBarbershops, resetBarbershopsToDefault } from "@/lib/barbershops-storage";
 import { ArrowLeft, MapPin, Star, Phone, Clock, Trash2, Plus, RefreshCcw } from "lucide-react";
 
+const generateUUID = (): string => {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).substring(2, 15)}-${Math.random().toString(36).substring(2, 15)}`;
+};
+
 const AdminProfile = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [barbershops, setBarbershops] = useState<Barbershop[]>(DEFAULT_BARBERSHOPS);
   const [activeId, setActiveId] = useState<string | null>(DEFAULT_BARBERSHOPS[0]?.id ?? null);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [showTermsDialog, setShowTermsDialog] = useState(false);
   const initializedRef = useRef(false);
 
   useEffect(() => {
     const data = loadBarbershops();
     setBarbershops(data);
-    setActiveId(data[0]?.id ?? null);
+    const storedActiveId = localStorage.getItem("admin_active_barbershop_id");
+    const initialId = storedActiveId ?? (data[0]?.id ?? null);
+    setActiveId(initialId);
+    if (initialId) {
+      localStorage.setItem("admin_active_barbershop_id", initialId);
+    }
     initializedRef.current = true;
   }, []);
 
@@ -42,6 +57,7 @@ const AdminProfile = () => {
 
   const handleSelect = (id: string) => {
     setActiveId(id);
+    localStorage.setItem("admin_active_barbershop_id", id);
   };
 
   const handleUpdate = <Key extends keyof Barbershop>(field: Key, value: Barbershop[Key]) => {
@@ -67,15 +83,21 @@ const AdminProfile = () => {
   };
 
   const handleAddBarbershop = () => {
+    const today = new Date();
+    const vencimento = new Date(today);
+    vencimento.setDate(vencimento.getDate() + 30);
+
     const newBarbershop: Barbershop = {
-      id: crypto.randomUUID(),
-      name: "Nova Barbearia",
-      rating: 4.5,
-      address: "Endereço completo",
-      phone: "(00) 00000-0000",
-      hours: "Seg à Sáb • 09h às 19h",
+      id: generateUUID(),
+      name: "",
+      rating: 0,
+      address: "",
+      phone: "",
+      hours: "",
       isOpen: true,
-      email: "contato@barberbook.com",
+      email: "",
+      status: "disponivel",
+      dataVencimento: vencimento.toISOString().split("T")[0],
     };
 
     setBarbershops((previous) => {
@@ -84,9 +106,12 @@ const AdminProfile = () => {
       return updated;
     });
 
+    setAgreedToTerms(false);
+    setShowTermsDialog(false);
+
     toast({
       title: "Barbearia adicionada",
-      description: "Configure os detalhes da nova unidade.",
+      description: "Preencha os detalhes da nova unidade.",
     });
   };
 
@@ -142,10 +167,108 @@ const AdminProfile = () => {
               </div>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Button variant="secondary" onClick={handleAddBarbershop}>
-                <Plus className="mr-2 h-4 w-4" />
-                Nova barbearia
-              </Button>
+              <AlertDialog open={showTermsDialog} onOpenChange={setShowTermsDialog}>
+                <AlertDialogTrigger asChild>
+                  <Button variant="secondary" onClick={() => setShowTermsDialog(true)}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Nova barbearia
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Termo de Uso - Mensalidade e Pagamento</AlertDialogTitle>
+                    <AlertDialogDescription asChild>
+                      <div className="space-y-4 pt-4">
+                        <div className="text-left space-y-3 text-sm">
+                          <p>
+                            <strong>1. Obrigação de Pagamento Mensal:</strong>
+                          </p>
+                          <p className="pl-4">
+                            Ao cadastrar sua barbearia na plataforma BarberBook Pro, você concorda em pagar uma mensalidade para manter sua unidade ativa e disponível para os clientes.
+                          </p>
+
+                          <p>
+                            <strong>2. Valor e Periodicidade:</strong>
+                          </p>
+                          <p className="pl-4">
+                            A mensalidade será cobrada mensalmente. O valor será informado no momento do cadastro e poderá ser atualizado com aviso prévio de 30 dias.
+                          </p>
+
+                          <p>
+                            <strong>3. Vencimento e Status:</strong>
+                          </p>
+                          <p className="pl-4">
+                            O pagamento deve ser efetuado até a data de vencimento estipulada. Caso o pagamento não seja realizado:
+                          </p>
+                          <ul className="pl-8 list-disc space-y-1">
+                            <li>Sua barbearia ficará com status "Indisponível" após o vencimento</li>
+                            <li>O botão "Selecionar Barbearia" será desabilitado para os clientes</li>
+                            <li>Após 3 (três) dias de atraso sem pagamento, o anúncio será automaticamente removido da plataforma</li>
+                          </ul>
+
+                          <p>
+                            <strong>4. Renovação Automática:</strong>
+                          </p>
+                          <p className="pl-4">
+                            Ao realizar o pagamento, o vencimento será automaticamente atualizado para os próximos 30 dias, mantendo sua barbearia disponível.
+                          </p>
+
+                          <p>
+                            <strong>5. Restauração:</strong>
+                          </p>
+                          <p className="pl-4">
+                            Caso seu anúncio seja removido por falta de pagamento, será necessário cadastrar novamente a barbearia após regularizar a situação.
+                          </p>
+
+                          <p>
+                            <strong>6. Aceitação dos Termos:</strong>
+                          </p>
+                          <p className="pl-4">
+                            Ao adicionar uma nova barbearia, você declara ter lido, compreendido e concordado com todos os termos acima relacionados à mensalidade e pagamento.
+                          </p>
+                        </div>
+
+                        <div className="flex items-start space-x-3 pt-4 border-t border-border">
+                          <Checkbox
+                            id="agree-terms"
+                            checked={agreedToTerms}
+                            onCheckedChange={(checked) => setAgreedToTerms(checked === true)}
+                            className="mt-1"
+                          />
+                          <Label
+                            htmlFor="agree-terms"
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                          >
+                            Eu li e concordo com os termos de mensalidade e pagamento acima descritos
+                          </Label>
+                        </div>
+                      </div>
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => setAgreedToTerms(false)}>
+                      Cancelar
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => {
+                        if (agreedToTerms) {
+                          setShowTermsDialog(false);
+                          handleAddBarbershop();
+                        } else {
+                          toast({
+                            title: "Aceite obrigatório",
+                            description: "Você precisa concordar com os termos para adicionar uma barbearia.",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                      disabled={!agreedToTerms}
+                    >
+                      Concordar e Adicionar
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="outline">
@@ -196,9 +319,9 @@ const AdminProfile = () => {
                     >
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="font-semibold">{barbershop.name}</p>
+                          <p className="font-semibold">{barbershop.name || "Nova Barbearia"}</p>
                           <span className="text-xs text-muted-foreground">
-                            {barbershop.email}
+                            {barbershop.email || "E-mail não informado"}
                           </span>
                         </div>
                         {isActive && <Badge variant="secondary">Selecionado</Badge>}
@@ -214,7 +337,11 @@ const AdminProfile = () => {
 
             <Card className="shadow-card border-border xl:col-span-2">
               <CardHeader>
-                <CardTitle>Detalhes da barbearia</CardTitle>
+                <CardTitle>
+                  {selectedBarbershop && (!selectedBarbershop.name || selectedBarbershop.name.trim() === "") 
+                    ? "Nova Barbearia" 
+                    : "Detalhes da barbearia"}
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
                 {!selectedBarbershop && (

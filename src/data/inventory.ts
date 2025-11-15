@@ -10,6 +10,7 @@ export interface StoreProduct {
   vipDiscount: number;
   vipPromotionLabel: string;
   createdAt: string;
+  category?: "produtos" | "consumo" | "bebidas";
 }
 
 export interface ConsumableItem {
@@ -49,6 +50,7 @@ export const DEFAULT_STORE_PRODUCTS: StoreProduct[] = [
     vipDiscount: 15,
     vipPromotionLabel: "VIP: 15% OFF",
     createdAt: new Date("2024-02-12T09:30:00Z").toISOString(),
+    category: "produtos",
   },
   {
     id: "prod-2",
@@ -62,6 +64,7 @@ export const DEFAULT_STORE_PRODUCTS: StoreProduct[] = [
     vipDiscount: 10,
     vipPromotionLabel: "VIP: +Hidratação mensal",
     createdAt: new Date("2024-01-28T16:45:00Z").toISOString(),
+    category: "produtos",
   },
   {
     id: "prod-3",
@@ -75,6 +78,7 @@ export const DEFAULT_STORE_PRODUCTS: StoreProduct[] = [
     vipDiscount: 20,
     vipPromotionLabel: "VIP: 20% OFF + frete grátis",
     createdAt: new Date("2024-03-03T11:20:00Z").toISOString(),
+    category: "produtos",
   },
 ];
 

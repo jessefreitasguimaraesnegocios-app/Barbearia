@@ -6,7 +6,14 @@ import {
   StorefrontSettings,
 } from "@/data/inventory";
 
-const STORAGE_KEY = "barberbook_admin_inventory";
+const STORAGE_KEY_PREFIX = "barberbook_admin_inventory";
+
+const getStorageKey = (barbershopId: string | null): string => {
+  if (!barbershopId) {
+    return `${STORAGE_KEY_PREFIX}_default`;
+  }
+  return `${STORAGE_KEY_PREFIX}_${barbershopId}`;
+};
 
 const isValidStoreProduct = (entry: unknown): entry is StoreProduct => {
   if (!entry || typeof entry !== "object") {
@@ -129,14 +136,18 @@ const sanitizeInventory = (inventory: InventoryData): InventoryData => ({
   },
 });
 
-export const loadInventory = (): InventoryData => {
+export const loadInventory = (barbershopId: string | null = null): InventoryData => {
   if (typeof window === "undefined") {
     return DEFAULT_INVENTORY;
   }
 
-  const stored = window.localStorage.getItem(STORAGE_KEY);
+  const storageKey = getStorageKey(barbershopId);
+  const stored = window.localStorage.getItem(storageKey);
 
   if (!stored) {
+    const currentOrigin = window.location.origin;
+    console.log(`[Inventory] No data found in localStorage for barbershop: ${barbershopId || 'default'} (origin: ${currentOrigin})`);
+    console.log(`[Inventory] Using default inventory.`);
     return DEFAULT_INVENTORY;
   }
 
@@ -144,25 +155,36 @@ export const loadInventory = (): InventoryData => {
     const parsed = JSON.parse(stored);
 
     if (!isValidInventory(parsed)) {
+      console.warn("[Inventory] Invalid inventory data found, using default");
       return DEFAULT_INVENTORY;
     }
 
-    return sanitizeInventory(parsed);
-  } catch {
+    const sanitized = sanitizeInventory(parsed);
+    console.log(`[Inventory] Loaded ${sanitized.storeProducts.length} products for barbershop: ${barbershopId || 'default'}`);
+    return sanitized;
+  } catch (error) {
+    console.error("[Inventory] Error parsing inventory data:", error);
     return DEFAULT_INVENTORY;
   }
 };
 
-export const persistInventory = (inventory: InventoryData) => {
+export const persistInventory = (inventory: InventoryData, barbershopId: string | null = null) => {
   if (typeof window === "undefined") {
     return;
   }
 
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitizeInventory(inventory)));
+  try {
+    const sanitized = sanitizeInventory(inventory);
+    const storageKey = getStorageKey(barbershopId);
+    window.localStorage.setItem(storageKey, JSON.stringify(sanitized));
+    console.log(`[Inventory] Saved ${sanitized.storeProducts.length} products for barbershop: ${barbershopId || 'default'}`);
+  } catch (error) {
+    console.error("[Inventory] Error saving inventory data:", error);
+  }
 };
 
-export const resetInventory = () => {
-  persistInventory(DEFAULT_INVENTORY);
+export const resetInventory = (barbershopId: string | null = null) => {
+  persistInventory(DEFAULT_INVENTORY, barbershopId);
 };
 
 

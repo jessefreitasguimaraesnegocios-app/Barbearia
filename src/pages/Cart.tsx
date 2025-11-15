@@ -8,9 +8,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useCart } from "@/context/CartContext";
-import { Trash2, ShoppingBag } from "lucide-react";
+import { Trash2, ShoppingBag, Plus, Minus } from "lucide-react";
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 
@@ -91,16 +90,31 @@ const Cart = () => {
                           <span className="text-sm text-muted-foreground">
                             Quantidade
                           </span>
-                          <Input
-                            type="number"
-                            min={1}
-                            max={99}
-                            value={item.quantity}
-                            onChange={(event) =>
-                              updateQuantity(item.id, Number(event.target.value))
-                            }
-                            className="w-24 text-center"
-                          />
+                          <div className="flex items-center gap-1 border border-border rounded-lg overflow-hidden">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-none"
+                              onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                              disabled={item.quantity <= 1}
+                              aria-label="Diminuir quantidade"
+                            >
+                              <Minus className="h-4 w-4" />
+                            </Button>
+                            <span className="w-12 text-center text-sm font-medium py-1">
+                              {item.quantity}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-none"
+                              onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                              disabled={item.quantity >= 99}
+                              aria-label="Aumentar quantidade"
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </CardContent>

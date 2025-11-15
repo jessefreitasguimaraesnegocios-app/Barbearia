@@ -12,11 +12,19 @@ import { loadInventory } from "@/lib/inventory-storage";
 
 const PLACEHOLDER_IMAGE = "/placeholder.svg";
 
+type CategoryFilter = "produtos" | "consumo" | "bebidas";
+
 const Shop = () => {
   const { addItem } = useCart();
   const { toast } = useToast();
   const [products, setProducts] = useState(DEFAULT_INVENTORY.storeProducts);
   const [storefront, setStorefront] = useState(DEFAULT_INVENTORY.storefront);
+  const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>("produtos");
+  const [selectedBarbershop, setSelectedBarbershop] = useState<{
+    id: number | string;
+    name: string;
+    email?: string;
+  } | null>(null);
 
   const currencyFormatter = useMemo(
     () => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }),
@@ -25,7 +33,20 @@ const Shop = () => {
 
   useEffect(() => {
     const applyInventory = () => {
-      const data = loadInventory();
+      const storedSelection = localStorage.getItem("selectedBarbershop");
+      let barbershopId: string | null = null;
+      
+      if (storedSelection) {
+        try {
+          const parsed = JSON.parse(storedSelection) as { id: number | string; name: string; email?: string };
+          barbershopId = typeof parsed.id === "number" ? String(parsed.id) : (parsed.id || null);
+          setSelectedBarbershop(parsed);
+        } catch {
+          // Ignore parse errors
+        }
+      }
+      
+      const data = loadInventory(barbershopId);
       setProducts(data.storeProducts);
       setStorefront(data.storefront);
     };
@@ -33,24 +54,35 @@ const Shop = () => {
     applyInventory();
 
     const handleStorage = (event: StorageEvent) => {
-      if (event.key === "barberbook_admin_inventory") {
+      if (event.key?.startsWith("barberbook_admin_inventory") || event.key === "selectedBarbershop") {
         applyInventory();
       }
     };
 
     window.addEventListener("storage", handleStorage);
+    
+    const handleLocalStorageChange = () => {
+      applyInventory();
+    };
+    
+    const originalSetItem = localStorage.setItem;
+    localStorage.setItem = function(...args) {
+      originalSetItem.apply(this, args);
+      if (args[0]?.startsWith("barberbook_admin_inventory") || args[0] === "selectedBarbershop") {
+        handleLocalStorageChange();
+      }
+    };
 
     return () => {
       window.removeEventListener("storage", handleStorage);
+      localStorage.setItem = originalSetItem;
     };
   }, []);
 
   const displayProducts = useMemo(() => {
-    if (!products.length) {
-      return DEFAULT_INVENTORY.storeProducts;
-    }
-    return products;
-  }, [products]);
+    const allProducts = !products.length ? DEFAULT_INVENTORY.storeProducts : products;
+    return allProducts.filter((product) => product.category === selectedCategory);
+  }, [products, selectedCategory]);
 
   const handleAddToCart = (product: (typeof displayProducts)[number]) => {
     const numericId = Number(product.id.toString().replace(/[^\d]/g, "")) || displayProducts.indexOf(product) + 1;
@@ -86,50 +118,93 @@ const Shop = () => {
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
               {storefront.subtitle}
             </p>
+            {selectedBarbershop && (
+              <div className="mt-4">
+                <span className="text-sm uppercase tracking-wide text-muted-foreground">
+                  Barbearia selecionada:
+                </span>
+                <p className="text-2xl font-display font-semibold text-primary mt-1">
+                  {selectedBarbershop.name}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Category Filters */}
+          <div className="flex flex-wrap justify-center gap-4 mb-12">
+            <Button
+              variant={selectedCategory === "produtos" ? "hero" : "outline"}
+              onClick={() => setSelectedCategory("produtos")}
+              className="min-w-[120px]"
+            >
+              Produtos
+            </Button>
+            <Button
+              variant={selectedCategory === "consumo" ? "hero" : "outline"}
+              onClick={() => setSelectedCategory("consumo")}
+              className="min-w-[120px]"
+            >
+              Consumo
+            </Button>
+            <Button
+              variant={selectedCategory === "bebidas" ? "hero" : "outline"}
+              onClick={() => setSelectedCategory("bebidas")}
+              className="min-w-[120px]"
+            >
+              Bebidas
+            </Button>
           </div>
 
           {/* Products Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {displayProducts.map((product) => (
-              <Card
-                key={product.id}
-                className="shadow-card hover:shadow-gold transition-all duration-300 border-border overflow-hidden group"
-              >
-                <div className="relative h-64 overflow-hidden bg-secondary">
-                  <img
-                    src={product.imageUrl || PLACEHOLDER_IMAGE}
-                    alt={product.name}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                  />
-                  <div className="absolute top-4 right-4 bg-card/90 backdrop-blur-sm px-3 py-1 rounded-full flex items-center space-x-1">
-                    <Star className="h-4 w-4 fill-primary text-primary" />
-                    <span className="text-sm font-semibold">
-                      {product.rating?.toFixed(1) ?? "5.0"}
-                    </span>
+          {displayProducts.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {displayProducts.map((product) => (
+                <Card
+                  key={product.id}
+                  className="shadow-card hover:shadow-gold transition-all duration-300 border-border overflow-hidden group"
+                >
+                  <div className="relative h-64 overflow-hidden bg-secondary">
+                    <img
+                      src={product.imageUrl || PLACEHOLDER_IMAGE}
+                      alt={product.name}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    />
+                    <div className="absolute top-4 right-4 bg-card/90 backdrop-blur-sm px-3 py-1 rounded-full flex items-center space-x-1">
+                      <Star className="h-4 w-4 fill-primary text-primary" />
+                      <span className="text-sm font-semibold">
+                        {product.rating?.toFixed(1) ?? "5.0"}
+                      </span>
+                    </div>
                   </div>
-                </div>
-                <CardHeader>
-                  <CardTitle className="text-xl">{product.name}</CardTitle>
-                  <p className="text-sm text-muted-foreground">{product.description}</p>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <span className="text-2xl font-bold text-primary">
-                      {currencyFormatter.format(product.price)}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="hero"
-                      onClick={() => handleAddToCart(product)}
-                    >
-                      <ShoppingCart className="h-4 w-4 mr-2" />
-                      Adicionar
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  <CardHeader>
+                    <CardTitle className="text-xl">{product.name}</CardTitle>
+                    <p className="text-sm text-muted-foreground">{product.description}</p>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between">
+                      <span className="text-2xl font-bold text-primary">
+                        {currencyFormatter.format(product.price)}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="hero"
+                        onClick={() => handleAddToCart(product)}
+                      >
+                        <ShoppingCart className="h-4 w-4 mr-2" />
+                        Adicionar
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-16">
+              <p className="text-xl text-muted-foreground">
+                Nenhum produto encontrado nesta categoria.
+              </p>
+            </div>
+          )}
 
           {/* Bottom Info */}
           <div className="mt-16 text-center">
