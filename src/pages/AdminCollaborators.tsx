@@ -445,7 +445,7 @@ const AdminCollaborators = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="collaborator-password">
-                        {selectedCollaborator ? "Nova senha (opcional)" : "Senha de acesso"}
+                        {selectedCollaborator ? "Senha de Login" : "Senha de acesso"}
                       </Label>
                       <Input
                         id="collaborator-password"

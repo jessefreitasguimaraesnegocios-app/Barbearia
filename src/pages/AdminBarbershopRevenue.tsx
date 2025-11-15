@@ -202,10 +202,6 @@ const AdminBarbershopRevenue = () => {
     return Array.from(vipMap.values()).sort((a, b) => b.totalRevenue - a.totalRevenue);
   }, [getMonthAppointments]);
 
-  const totalVipRevenue = useMemo(() => {
-    return vipRevenues.reduce((sum, vip) => sum + vip.totalRevenue, 0);
-  }, [vipRevenues]);
-
   const barbersWithChairRental = useMemo(() => {
     const barberIds = new Set<string>();
     collaborators.forEach((collaborator) => {

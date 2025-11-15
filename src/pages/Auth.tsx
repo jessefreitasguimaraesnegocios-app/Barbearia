@@ -56,10 +56,16 @@ const Auth = () => {
       }
     };
 
+    const handleFocus = () => {
+      setCollaborators(loadCollaborators());
+    };
+
     window.addEventListener("storage", handleStorage);
+    window.addEventListener("focus", handleFocus);
 
     return () => {
       window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("focus", handleFocus);
     };
   }, []);
 
