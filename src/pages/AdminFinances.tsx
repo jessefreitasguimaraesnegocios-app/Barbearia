@@ -374,7 +374,10 @@ const AdminFinances = () => {
               </CardContent>
             </Card>
 
-            <Card className="shadow-card border-border">
+            <Card 
+              className="shadow-card border-border cursor-pointer transition-transform hover:-translate-y-1"
+              onClick={() => navigate("/admin/financas/receita-loja")}
+            >
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>

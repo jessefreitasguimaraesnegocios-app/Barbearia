@@ -25,6 +25,7 @@ import AdminInventory from "./pages/AdminInventory";
 import AdminShop from "./pages/AdminShop";
 import AdminExpenses from "./pages/AdminExpenses";
 import AdminBarbershopRevenue from "./pages/AdminBarbershopRevenue";
+import AdminStoreRevenue from "./pages/AdminStoreRevenue";
 import NotFound from "./pages/NotFound";
 import CollaboratorMenu from "./pages/CollaboratorMenu";
 import RequireAdmin from "./components/RequireAdmin";
@@ -54,6 +55,7 @@ const App = () => (
               <Route path="/admin/financas" element={<RequireAdmin><AdminFinances /></RequireAdmin>} />
               <Route path="/admin/financas/despesas" element={<RequireAdmin><AdminExpenses /></RequireAdmin>} />
               <Route path="/admin/financas/receita-barbearia" element={<RequireAdmin><AdminBarbershopRevenue /></RequireAdmin>} />
+              <Route path="/admin/financas/receita-loja" element={<RequireAdmin><AdminStoreRevenue /></RequireAdmin>} />
               <Route path="/admin/servicos" element={<RequireAdmin><AdminServices /></RequireAdmin>} />
               <Route path="/admin/perfil" element={<RequireAdmin><AdminProfile /></RequireAdmin>} />
               <Route path="/admin/colaboradores" element={<RequireAdmin><AdminCollaborators /></RequireAdmin>} />
