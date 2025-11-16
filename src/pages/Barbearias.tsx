@@ -106,6 +106,7 @@ const Barbearias = () => {
                           id: barbershop.id,
                           name: barbershop.name,
                           email: barbershop.email,
+                          source: "user",
                         })
                       );
                       navigate("/services");

@@ -9,10 +9,18 @@ import { useCart } from "@/context/CartContext";
 import { useToast } from "@/components/ui/use-toast";
 import { DEFAULT_INVENTORY } from "@/data/inventory";
 import { loadInventory } from "@/lib/inventory-storage";
+import { DEFAULT_BARBERSHOP_SELECTION_KEY, getDefaultBarbershopSelection } from "@/lib/barbershop-selection";
 
 const PLACEHOLDER_IMAGE = "/placeholder.svg";
 
 type CategoryFilter = "produtos" | "consumo" | "bebidas";
+
+type StoredBarbershopSelection = {
+  id: string;
+  name: string;
+  email?: string;
+  source?: "default" | "user";
+};
 
 const Shop = () => {
   const { addItem } = useCart();
@@ -20,11 +28,7 @@ const Shop = () => {
   const [products, setProducts] = useState(DEFAULT_INVENTORY.storeProducts);
   const [storefront, setStorefront] = useState(DEFAULT_INVENTORY.storefront);
   const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>("produtos");
-  const [selectedBarbershop, setSelectedBarbershop] = useState<{
-    id: number | string;
-    name: string;
-    email?: string;
-  } | null>(null);
+  const [selectedBarbershop, setSelectedBarbershop] = useState<StoredBarbershopSelection | null>(null);
 
   const currencyFormatter = useMemo(
     () => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }),
@@ -33,20 +37,57 @@ const Shop = () => {
 
   useEffect(() => {
     const applyInventory = () => {
+      let selection: StoredBarbershopSelection | null = null;
       const storedSelection = localStorage.getItem("selectedBarbershop");
-      let barbershopId: string | null = null;
-      
+
       if (storedSelection) {
         try {
-          const parsed = JSON.parse(storedSelection) as { id: number | string; name: string; email?: string };
-          barbershopId = typeof parsed.id === "number" ? String(parsed.id) : (parsed.id || null);
-          setSelectedBarbershop(parsed);
+          const parsed = JSON.parse(storedSelection) as Partial<StoredBarbershopSelection> & { id?: number | string };
+          if ((typeof parsed.id === "string" || typeof parsed.id === "number") && typeof parsed.name === "string") {
+            selection = {
+              id: typeof parsed.id === "number" ? parsed.id.toString() : parsed.id,
+              name: parsed.name,
+              email: typeof parsed.email === "string" ? parsed.email : undefined,
+              source: parsed.source === "default" ? "default" : parsed.source === "user" ? "user" : undefined,
+            };
+          } else {
+            localStorage.removeItem("selectedBarbershop");
+          }
         } catch {
-          // Ignore parse errors
+          localStorage.removeItem("selectedBarbershop");
         }
       }
-      
-      const data = loadInventory(barbershopId);
+
+      const defaultSelection = getDefaultBarbershopSelection();
+
+      if (!selection) {
+        if (defaultSelection) {
+          selection = {
+            ...defaultSelection,
+            source: "default",
+          };
+          localStorage.setItem("selectedBarbershop", JSON.stringify(selection));
+        }
+      } else if (selection.source === "default") {
+        if (!defaultSelection) {
+          selection = null;
+          localStorage.removeItem("selectedBarbershop");
+        } else if (
+          defaultSelection.id !== selection.id ||
+          defaultSelection.name !== selection.name ||
+          (defaultSelection.email || "") !== (selection.email || "")
+        ) {
+          selection = {
+            ...defaultSelection,
+            source: "default",
+          };
+          localStorage.setItem("selectedBarbershop", JSON.stringify(selection));
+        }
+      }
+
+      setSelectedBarbershop(selection);
+
+      const data = loadInventory(selection?.id ?? null);
       setProducts(data.storeProducts);
       setStorefront(data.storefront);
     };
@@ -54,7 +95,11 @@ const Shop = () => {
     applyInventory();
 
     const handleStorage = (event: StorageEvent) => {
-      if (event.key?.startsWith("barberbook_admin_inventory") || event.key === "selectedBarbershop") {
+      if (
+        event.key?.startsWith("barberbook_admin_inventory") ||
+        event.key === "selectedBarbershop" ||
+        event.key === DEFAULT_BARBERSHOP_SELECTION_KEY
+      ) {
         applyInventory();
       }
     };
@@ -68,7 +113,11 @@ const Shop = () => {
     const originalSetItem = localStorage.setItem;
     localStorage.setItem = function(...args) {
       originalSetItem.apply(this, args);
-      if (args[0]?.startsWith("barberbook_admin_inventory") || args[0] === "selectedBarbershop") {
+      if (
+        args[0]?.startsWith("barberbook_admin_inventory") ||
+        args[0] === "selectedBarbershop" ||
+        args[0] === DEFAULT_BARBERSHOP_SELECTION_KEY
+      ) {
         handleLocalStorageChange();
       }
     };

@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DEFAULT_INVENTORY, InventoryData, StoreProduct } from "@/data/inventory";
 import { loadInventory, persistInventory, resetInventory } from "@/lib/inventory-storage";
 import { loadBarbershops } from "@/lib/barbershops-storage";
+import { setDefaultBarbershopSelection } from "@/lib/barbershop-selection";
 import { useToast } from "@/components/ui/use-toast";
 import { ArrowLeft, ImageIcon, RefreshCcw, ShoppingCart, ShoppingBag, Star, Trash2, Plus, Sparkles } from "lucide-react";
 
@@ -67,13 +68,29 @@ const AdminShop = () => {
   useEffect(() => {
     const loadData = () => {
       const barbershops = loadBarbershops();
-      const activeId = barbershops[0]?.id ?? null;
-      setActiveBarbershopId(activeId);
-      
       const storedActiveId = localStorage.getItem("admin_active_barbershop_id");
-      const barbershopId = storedActiveId || activeId;
-      
-      const data = loadInventory(barbershopId);
+      const storedMatch = storedActiveId ? barbershops.find((shop) => shop.id === storedActiveId) : null;
+      const fallbackBarbershop = barbershops[0] ?? null;
+      const targetBarbershop = storedMatch ?? fallbackBarbershop;
+      const resolvedBarbershopId = targetBarbershop?.id ?? null;
+
+      if (resolvedBarbershopId && storedActiveId !== resolvedBarbershopId) {
+        localStorage.setItem("admin_active_barbershop_id", resolvedBarbershopId);
+      }
+
+      setActiveBarbershopId(resolvedBarbershopId);
+
+      if (targetBarbershop) {
+        setDefaultBarbershopSelection({
+          id: targetBarbershop.id,
+          name: targetBarbershop.name || "Barbearia",
+          email: targetBarbershop.email,
+        });
+      } else {
+        setDefaultBarbershopSelection(null);
+      }
+
+      const data = loadInventory(resolvedBarbershopId);
       setInventory(data);
       setStorefrontForm(data.storefront);
       setActiveProductId(data.storeProducts[0]?.id ?? null);
