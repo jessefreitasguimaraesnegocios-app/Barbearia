@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "./ui/button";
 import { ThemeToggle } from "./ThemeToggle";
@@ -7,6 +7,28 @@ import { Scissors, Menu, X, Calendar, ShoppingBag, LayoutDashboard, LogIn } from
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
+  const [activeCollaborator, setActiveCollaborator] = useState<null | { id: string; name: string; role: string }>(() => {
+    try {
+      const stored = localStorage.getItem("activeCollaborator");
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "activeCollaborator") {
+        try {
+          setActiveCollaborator(e.newValue ? JSON.parse(e.newValue) : null);
+        } catch {
+          setActiveCollaborator(null);
+        }
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -51,18 +73,29 @@ export const Navbar = () => {
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center space-x-4">
             <ThemeToggle />
-            <Link to="/admin">
-              <Button variant="ghost" size="sm">
-                <LayoutDashboard className="h-4 w-4 mr-2" />
-                Admin
-              </Button>
-            </Link>
-            <Link to="/auth">
-              <Button variant="hero" size="sm">
-                <LogIn className="h-4 w-4 mr-2" />
-                Entrar
-              </Button>
-            </Link>
+            {activeCollaborator?.role === "socio" ? (
+              <Link to="/admin">
+                <Button variant="ghost" size="sm">
+                  <LayoutDashboard className="h-4 w-4 mr-2" />
+                  Admin
+                </Button>
+              </Link>
+            ) : activeCollaborator ? (
+              <Link to="/menu">
+                <Button variant="ghost" size="sm">
+                  <LayoutDashboard className="h-4 w-4 mr-2" />
+                  Menu
+                </Button>
+              </Link>
+            ) : null}
+            {!activeCollaborator && (
+              <Link to="/auth">
+                <Button variant="hero" size="sm">
+                  <LogIn className="h-4 w-4 mr-2" />
+                  Entrar
+                </Button>
+              </Link>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -94,18 +127,30 @@ export const Navbar = () => {
             ))}
             <div className="px-4 pt-3 space-y-2 border-t border-border">
               <ThemeToggle />
-              <Link to="/admin" onClick={() => setIsOpen(false)}>
-                <Button variant="ghost" className="w-full justify-start">
-                  <LayoutDashboard className="h-4 w-4 mr-2" />
-                  Admin
-                </Button>
-              </Link>
-              <Link to="/auth" onClick={() => setIsOpen(false)}>
-                <Button variant="hero" className="w-full">
-                  <LogIn className="h-4 w-4 mr-2" />
-                  Entrar
-                </Button>
-              </Link>
+              {activeCollaborator?.role === "socio" && (
+                <Link to="/admin" onClick={() => setIsOpen(false)}>
+                  <Button variant="ghost" className="w-full justify-start">
+                    <LayoutDashboard className="h-4 w-4 mr-2" />
+                    Admin
+                  </Button>
+                </Link>
+              )}
+              {activeCollaborator && activeCollaborator.role !== "socio" && (
+                <Link to="/menu" onClick={() => setIsOpen(false)}>
+                  <Button variant="ghost" className="w-full justify-start">
+                    <LayoutDashboard className="h-4 w-4 mr-2" />
+                    Menu
+                  </Button>
+                </Link>
+              )}
+              {!activeCollaborator && (
+                <Link to="/auth" onClick={() => setIsOpen(false)}>
+                  <Button variant="hero" className="w-full">
+                    <LogIn className="h-4 w-4 mr-2" />
+                    Entrar
+                  </Button>
+                </Link>
+              )}
             </div>
           </div>
         )}

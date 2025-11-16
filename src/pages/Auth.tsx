@@ -9,8 +9,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Eye, EyeOff } from "lucide-react";
 import { Collaborator } from "@/data/collaborators";
-import { loadCollaborators } from "@/lib/collaborators-storage";
+import { loadCollaborators, persistCollaborators } from "@/lib/collaborators-storage";
 import { verifyPassword } from "@/lib/password";
+import { useNavigate } from "react-router-dom";
+import { toast } from "@/components/ui/sonner";
+import { hashPassword } from "@/lib/password";
 
 const GoogleIcon = () => (
   <svg
@@ -39,6 +42,7 @@ const GoogleIcon = () => (
 );
 
 const Auth = () => {
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -48,6 +52,16 @@ const Auth = () => {
   const [loginMessage, setLoginMessage] = useState<string | null>(null);
   const [loginStatus, setLoginStatus] = useState<"success" | "error" | null>(null);
   const [collaborators, setCollaborators] = useState<Collaborator[]>(() => loadCollaborators());
+  const [tab, setTab] = useState<"login" | "signup">("login");
+  const [signupCompany, setSignupCompany] = useState("");
+  const [signupCnpj, setSignupCnpj] = useState("");
+  const [signupResponsavel, setSignupResponsavel] = useState("");
+  const [signupCpf, setSignupCpf] = useState("");
+  const [signupWhatsapp, setSignupWhatsapp] = useState("");
+  const [signupEmail, setSignupEmail] = useState("");
+  const [signupEndereco, setSignupEndereco] = useState("");
+  const [signupPassword, setSignupPassword] = useState("");
+  const [signupConfirm, setSignupConfirm] = useState("");
 
   useEffect(() => {
     const handleStorage = (event: StorageEvent) => {
@@ -119,13 +133,65 @@ const Auth = () => {
           loggedAt: new Date().toISOString(),
         }),
       );
+      // Redireciona colaboradores para a página Início
+      navigate("/");
     }, 500);
   };
 
   const handleSignup = (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setTimeout(() => setIsLoading(false), 500);
+    setTimeout(() => {
+      // validações básicas
+      const email = signupEmail.trim().toLowerCase();
+      if (signupPassword !== signupConfirm) {
+        setIsLoading(false);
+        toast.error("As senhas não coincidem");
+        return;
+      }
+      if (collaborators.some((c) => c.email.toLowerCase() === email)) {
+        setIsLoading(false);
+        toast.error("E-mail já cadastrado");
+        return;
+      }
+
+      const id =
+        (typeof crypto !== "undefined" && "randomUUID" in crypto && crypto.randomUUID()) ||
+        `c_${Math.random().toString(36).slice(2, 10)}`;
+
+      const newCollaborator: Collaborator = {
+        id,
+        name: signupResponsavel.trim(),
+        phone: signupWhatsapp.trim(),
+        email,
+        cpf: signupCpf.trim(),
+        password: hashPassword(signupPassword),
+        role: "socio",
+        specialty: "",
+        createdAt: new Date().toISOString(),
+      };
+
+      const next = [...collaborators, newCollaborator];
+      persistCollaborators(next);
+      setCollaborators(next);
+
+      // limpa campos e informa sucesso
+      setLoginEmail(email);
+      setLoginPassword(signupPassword);
+      setSignupCompany("");
+      setSignupCnpj("");
+      setSignupResponsavel("");
+      setSignupCpf("");
+      setSignupWhatsapp("");
+      setSignupEmail("");
+      setSignupEndereco("");
+      setSignupPassword("");
+      setSignupConfirm("");
+
+      setIsLoading(false);
+      toast.success("Cadastro Realizado com Sucesso!", { duration: 2000 });
+      setTab("login");
+    }, 500);
   };
 
   return (
@@ -139,7 +205,7 @@ const Auth = () => {
               <CardTitle className="text-3xl font-display">Acesse sua Conta</CardTitle>
             </CardHeader>
             <CardContent>
-              <Tabs defaultValue="login" className="w-full">
+              <Tabs value={tab} onValueChange={(v) => setTab(v as "login" | "signup")} className="w-full">
                 <TabsList className="grid w-full grid-cols-2 mb-6">
                   <TabsTrigger value="login">Entrar</TabsTrigger>
                   <TabsTrigger value="signup">Cadastrar</TabsTrigger>
@@ -157,7 +223,8 @@ const Auth = () => {
                         required
                         value={loginEmail}
                         onChange={(event) => setLoginEmail(event.target.value)}
-                      />
+                      value={signupCompany}
+                      onChange={(e) => setSignupCompany(e.target.value)} />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="login-password">Senha</Label>
@@ -170,7 +237,8 @@ const Auth = () => {
                           className="pr-10"
                           value={loginPassword}
                           onChange={(event) => setLoginPassword(event.target.value)}
-                        />
+                        value={signupCnpj}
+                        onChange={(e) => setSignupCnpj(e.target.value)} />
                         <button
                           type="button"
                           onClick={() => setShowLoginPassword(!showLoginPassword)}
@@ -241,7 +309,8 @@ const Auth = () => {
                           type="text"
                           placeholder="00.000.000/0000-00"
                           required
-                        />
+                        value={signupResponsavel}
+                        onChange={(e) => setSignupResponsavel(e.target.value)} />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="signup-responsavel">Responsável</Label>
@@ -250,7 +319,8 @@ const Auth = () => {
                           type="text"
                           placeholder="Nome completo do responsável"
                           required
-                        />
+                        value={signupCpf}
+                        onChange={(e) => setSignupCpf(e.target.value)} />
                       </div>
                     </div>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -261,7 +331,8 @@ const Auth = () => {
                           type="text"
                           placeholder="000.000.000-00"
                           required
-                        />
+                        value={signupWhatsapp}
+                        onChange={(e) => setSignupWhatsapp(e.target.value)} />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="signup-whatsapp">WhatsApp</Label>
@@ -280,7 +351,8 @@ const Auth = () => {
                         type="email"
                         placeholder="seu@email.com"
                         required
-                      />
+                      value={signupEmail}
+                      onChange={(e) => setSignupEmail(e.target.value)} />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="signup-endereco">Endereço</Label>
@@ -289,7 +361,8 @@ const Auth = () => {
                         placeholder="Rua, número, bairro, cidade e estado"
                         required
                         className="min-h-[80px]"
-                      />
+                      value={signupEndereco}
+                      onChange={(e) => setSignupEndereco(e.target.value)} />
                     </div>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                       <div className="space-y-2">
@@ -301,7 +374,8 @@ const Auth = () => {
                             placeholder="••••••••"
                             required
                             className="pr-10"
-                          />
+                            value={signupPassword}
+                            onChange={(e) => setSignupPassword(e.target.value)} />
                           <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
@@ -321,7 +395,8 @@ const Auth = () => {
                             placeholder="••••••••"
                             required
                             className="pr-10"
-                          />
+                            value={signupConfirm}
+                            onChange={(e) => setSignupConfirm(e.target.value)} />
                           <button
                             type="button"
                             onClick={() => setShowConfirmPassword(!showConfirmPassword)}

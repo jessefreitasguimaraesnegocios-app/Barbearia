@@ -26,6 +26,8 @@ import AdminShop from "./pages/AdminShop";
 import AdminExpenses from "./pages/AdminExpenses";
 import AdminBarbershopRevenue from "./pages/AdminBarbershopRevenue";
 import NotFound from "./pages/NotFound";
+import CollaboratorMenu from "./pages/CollaboratorMenu";
+import RequireAdmin from "./components/RequireAdmin";
 
 const queryClient = new QueryClient();
 
@@ -39,6 +41,7 @@ const App = () => (
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<Index />} />
+              <Route path="/menu" element={<CollaboratorMenu />} />
               <Route path="/barbearias" element={<Barbearias />} />
               <Route path="/services" element={<Services />} />
               <Route path="/booking" element={<Booking />} />
@@ -46,18 +49,18 @@ const App = () => (
               <Route path="/shop" element={<Shop />} />
               <Route path="/cart" element={<Cart />} />
               <Route path="/auth" element={<Auth />} />
-              <Route path="/admin" element={<Admin />} />
-              <Route path="/admin/agendamentos" element={<AdminBookings />} />
-              <Route path="/admin/financas" element={<AdminFinances />} />
-              <Route path="/admin/financas/despesas" element={<AdminExpenses />} />
-              <Route path="/admin/financas/receita-barbearia" element={<AdminBarbershopRevenue />} />
-              <Route path="/admin/servicos" element={<AdminServices />} />
-              <Route path="/admin/perfil" element={<AdminProfile />} />
-              <Route path="/admin/colaboradores" element={<AdminCollaborators />} />
-              <Route path="/admin/colaboradores/:id" element={<CollaboratorDetails />} />
-              <Route path="/admin/vips" element={<AdminVip />} />
-              <Route path="/admin/estoque" element={<AdminInventory />} />
-              <Route path="/admin/loja" element={<AdminShop />} />
+              <Route path="/admin" element={<RequireAdmin><Admin /></RequireAdmin>} />
+              <Route path="/admin/agendamentos" element={<RequireAdmin><AdminBookings /></RequireAdmin>} />
+              <Route path="/admin/financas" element={<RequireAdmin><AdminFinances /></RequireAdmin>} />
+              <Route path="/admin/financas/despesas" element={<RequireAdmin><AdminExpenses /></RequireAdmin>} />
+              <Route path="/admin/financas/receita-barbearia" element={<RequireAdmin><AdminBarbershopRevenue /></RequireAdmin>} />
+              <Route path="/admin/servicos" element={<RequireAdmin><AdminServices /></RequireAdmin>} />
+              <Route path="/admin/perfil" element={<RequireAdmin><AdminProfile /></RequireAdmin>} />
+              <Route path="/admin/colaboradores" element={<RequireAdmin><AdminCollaborators /></RequireAdmin>} />
+              <Route path="/admin/colaboradores/:id" element={<RequireAdmin><CollaboratorDetails /></RequireAdmin>} />
+              <Route path="/admin/vips" element={<RequireAdmin><AdminVip /></RequireAdmin>} />
+              <Route path="/admin/estoque" element={<RequireAdmin><AdminInventory /></RequireAdmin>} />
+              <Route path="/admin/loja" element={<RequireAdmin><AdminShop /></RequireAdmin>} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
