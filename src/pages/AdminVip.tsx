@@ -72,7 +72,9 @@ const AdminVip = () => {
 
   const daysRemaining = (member: VipMember) => {
     const now = new Date();
+    now.setHours(0, 0, 0, 0);
     const expiresAt = new Date(member.expiresAt);
+    expiresAt.setHours(0, 0, 0, 0);
     const diff = Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     return diff;
   };
@@ -97,6 +99,36 @@ const AdminVip = () => {
     setBenefitsInput(nextBenefits.join("\n"));
   };
 
+  const formatCPF = (value: string) => {
+    const numbers = value.replace(/\D/g, "");
+    if (numbers.length <= 11) {
+      if (numbers.length <= 3) {
+        return numbers;
+      } else if (numbers.length <= 6) {
+        return `${numbers.slice(0, 3)}.${numbers.slice(3)}`;
+      } else if (numbers.length <= 9) {
+        return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6)}`;
+      } else {
+        return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6, 9)}-${numbers.slice(9, 11)}`;
+      }
+    }
+    return value;
+  };
+
+  const formatPhone = (value: string) => {
+    const numbers = value.replace(/\D/g, "");
+    if (numbers.length <= 11) {
+      if (numbers.length <= 2) {
+        return numbers.length > 0 ? `(${numbers}` : numbers;
+      } else if (numbers.length <= 7) {
+        return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+      } else {
+        return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
+      }
+    }
+    return value;
+  };
+
   const handleMemberFormChange = <Key extends keyof VipMemberFormState>(field: Key, value: VipMemberFormState[Key]) => {
     setMemberForm((previous) => ({
       ...previous,
@@ -104,65 +136,100 @@ const AdminVip = () => {
     }));
   };
 
-  const durationToExpiration = (billingCycle: VipBillingCycle) => {
-    const start = new Date();
-    const expires = new Date(start);
+  const durationToExpiration = (billingCycle: VipBillingCycle, startDate: Date) => {
+    const expires = new Date(startDate);
+    expires.setHours(0, 0, 0, 0);
+    
     if (billingCycle === "monthly") {
-      expires.setMonth(expires.getMonth() + 1);
+      expires.setDate(expires.getDate() + 30);
     } else {
       expires.setFullYear(expires.getFullYear() + 1);
     }
+    
     return expires.toISOString();
   };
 
   const handleAddVipMember = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!memberForm.name.trim() || !memberForm.email.trim() || !memberForm.cpf.trim()) {
+    try {
+      if (!memberForm.name.trim() || !memberForm.email.trim() || !memberForm.cpf.trim()) {
+        toast({
+          variant: "destructive",
+          title: "Dados incompletos",
+          description: "Informe nome, e-mail e CPF para cadastrar o VIP.",
+        });
+        return;
+      }
+
+      const normalizedEmail = memberForm.email.trim().toLowerCase();
+      const exists = vipData.members.some((member) => member.email.toLowerCase() === normalizedEmail);
+
+      if (exists) {
+        toast({
+          variant: "destructive",
+          title: "Cadastro duplicado",
+          description: "Já existe um VIP com este e-mail.",
+        });
+        return;
+      }
+
+      const phoneNumbers = (memberForm.phone || "").replace(/\D/g, "");
+      const cpfNumbers = memberForm.cpf.replace(/\D/g, "");
+
+      if (cpfNumbers.length !== 11) {
+        toast({
+          variant: "destructive",
+          title: "CPF inválido",
+          description: "O CPF deve conter exatamente 11 dígitos.",
+        });
+        return;
+      }
+
+      if (phoneNumbers && phoneNumbers.length !== 11) {
+        toast({
+          variant: "destructive",
+          title: "WhatsApp inválido",
+          description: "O WhatsApp deve conter exatamente 11 dígitos (DDD + 9 dígitos).",
+        });
+        return;
+      }
+
+      const joinedAtDate = new Date();
+      joinedAtDate.setHours(0, 0, 0, 0);
+      const joinedAt = joinedAtDate.toISOString();
+      
+      const newMember: VipMember = {
+        id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `vip-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        name: memberForm.name.trim(),
+        email: normalizedEmail,
+        phone: phoneNumbers,
+        cpf: cpfNumbers,
+        billingCycle: memberForm.billingCycle,
+        paymentStatus: memberForm.paymentStatus,
+        joinedAt,
+        expiresAt: durationToExpiration(memberForm.billingCycle, joinedAtDate),
+      };
+
+      setVipData((previous) => ({
+        ...previous,
+        members: [...previous.members, newMember],
+      }));
+
+      setMemberForm(INITIAL_MEMBER_FORM);
+
+      toast({
+        title: "VIP cadastrado",
+        description: `${newMember.name} foi adicionado à lista.`,
+      });
+    } catch (error) {
+      console.error("Erro ao adicionar VIP:", error);
       toast({
         variant: "destructive",
-        title: "Dados incompletos",
-        description: "Informe nome, e-mail e CPF para cadastrar o VIP.",
+        title: "Erro ao cadastrar",
+        description: "Ocorreu um erro ao adicionar o VIP. Tente novamente.",
       });
-      return;
     }
-
-    const normalizedEmail = memberForm.email.trim().toLowerCase();
-    const exists = vipData.members.some((member) => member.email.toLowerCase() === normalizedEmail);
-
-    if (exists) {
-      toast({
-        variant: "destructive",
-        title: "Cadastro duplicado",
-        description: "Já existe um VIP com este e-mail.",
-      });
-      return;
-    }
-
-    const joinedAt = new Date().toISOString();
-    const newMember: VipMember = {
-      id: crypto.randomUUID(),
-      name: memberForm.name.trim(),
-      email: normalizedEmail,
-      phone: memberForm.phone.trim(),
-      cpf: memberForm.cpf.trim(),
-      billingCycle: memberForm.billingCycle,
-      paymentStatus: memberForm.paymentStatus,
-      joinedAt,
-      expiresAt: durationToExpiration(memberForm.billingCycle),
-    };
-
-    setVipData((previous) => ({
-      ...previous,
-      members: [...previous.members, newMember],
-    }));
-
-    setMemberForm(INITIAL_MEMBER_FORM);
-
-    toast({
-      title: "VIP cadastrado",
-      description: `${newMember.name} foi adicionado à lista.`,
-    });
   };
 
   const handleRemoveVipMember = (id: string) => {
@@ -254,18 +321,34 @@ const AdminVip = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="vip-price">Valor da assinatura</Label>
+                  <Label htmlFor="vip-price-monthly">Valor da assinatura - Mensal</Label>
                   <Input
-                    id="vip-price"
-                    value={vipData.config.price.toString().replace(".", ",")}
+                    id="vip-price-monthly"
+                    value={vipData.config.priceMonthly.toString().replace(".", ",")}
                     onChange={(event) => {
                       const normalized = event.target.value.replace(/[^\d,]/g, "").replace(",", ".");
                       const numeric = Number(normalized);
                       if (!Number.isNaN(numeric)) {
-                        handleConfigChange("price", numeric);
+                        handleConfigChange("priceMonthly", numeric);
                       }
                     }}
                     placeholder="Ex.: 199,90"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="vip-price-annual">Valor da assinatura - Anual</Label>
+                  <Input
+                    id="vip-price-annual"
+                    value={vipData.config.priceAnnual.toString().replace(".", ",")}
+                    onChange={(event) => {
+                      const normalized = event.target.value.replace(/[^\d,]/g, "").replace(",", ".");
+                      const numeric = Number(normalized);
+                      if (!Number.isNaN(numeric)) {
+                        handleConfigChange("priceAnnual", numeric);
+                      }
+                    }}
+                    placeholder="Ex.: 500,00"
                   />
                 </div>
 
@@ -299,15 +382,28 @@ const AdminVip = () => {
                   </p>
                 </div>
 
-                <div className="rounded-lg border border-border bg-secondary/30 px-4 py-3 text-sm text-muted-foreground">
+                <div className="rounded-lg border border-border bg-secondary/30 px-4 py-3 space-y-2 text-sm text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <Wallet className="h-4 w-4 text-primary" />
                     <span>
-                      Valor atual:{" "}
+                      Valor Mensal:{" "}
                       <strong className="text-primary">
-                        {currencyFormatter.format(vipData.config.price || 0)}
-                      </strong>{" "}
-                      ({BILLING_CYCLE_LABEL[vipData.config.billingCycle]})
+                        {currencyFormatter.format(vipData.config.priceMonthly || 0)}
+                      </strong>
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Wallet className="h-4 w-4 text-primary" />
+                    <span>
+                      Valor Anual:{" "}
+                      <strong className="text-primary">
+                        {currencyFormatter.format(vipData.config.priceAnnual || 0)}
+                      </strong>
+                    </span>
+                  </div>
+                  <div className="pt-2 border-t border-border">
+                    <span>
+                      Plano padrão: <strong className="text-primary">{BILLING_CYCLE_LABEL[vipData.config.billingCycle]}</strong>
                     </span>
                   </div>
                 </div>
@@ -361,13 +457,15 @@ const AdminVip = () => {
                                   <Mail className="h-4 w-4 text-primary" />
                                   {member.email}
                                 </div>
-                                <div className="flex items-center gap-2">
-                                  <Phone className="h-4 w-4 text-primary" />
-                                  {member.phone}
-                                </div>
+                                {member.phone && (
+                                  <div className="flex items-center gap-2">
+                                    <Phone className="h-4 w-4 text-primary" />
+                                    {formatPhone(member.phone)}
+                                  </div>
+                                )}
                                 <div className="flex items-center gap-2">
                                   <Shield className="h-4 w-4 text-primary" />
-                                  {member.cpf}
+                                  {formatCPF(member.cpf)}
                                 </div>
                               </div>
                             </div>
@@ -376,8 +474,8 @@ const AdminVip = () => {
                                 <Calendar className="h-4 w-4 text-primary" />
                                 <span>{expiresLabel}</span>
                               </div>
-                              <div>Início: {new Date(member.joinedAt).toLocaleDateString()}</div>
-                              <div>Expira: {new Date(member.expiresAt).toLocaleDateString()}</div>
+                              <div>Início: {new Date(member.joinedAt).toLocaleDateString("pt-BR")}</div>
+                              <div>Expira: {new Date(member.expiresAt).toLocaleDateString("pt-BR")}</div>
                             </div>
                           </div>
 
@@ -467,18 +565,22 @@ const AdminVip = () => {
                       <Label htmlFor="vip-phone">WhatsApp</Label>
                       <Input
                         id="vip-phone"
+                        type="tel"
                         value={memberForm.phone}
-                        onChange={(event) => handleMemberFormChange("phone", event.target.value)}
+                        onChange={(event) => handleMemberFormChange("phone", formatPhone(event.target.value))}
                         placeholder="(11) 90000-0000"
+                        maxLength={15}
                       />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="vip-cpf">CPF</Label>
                       <Input
                         id="vip-cpf"
+                        type="text"
                         value={memberForm.cpf}
-                        onChange={(event) => handleMemberFormChange("cpf", event.target.value)}
+                        onChange={(event) => handleMemberFormChange("cpf", formatCPF(event.target.value))}
                         placeholder="000.000.000-00"
+                        maxLength={14}
                         required
                       />
                     </div>

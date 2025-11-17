@@ -273,7 +273,7 @@ const AdminShop = () => {
       ...baseProduct,
       name: productForm.name.trim(),
       description: productForm.description.trim(),
-      imageUrl: productForm.imageUrl || "",
+      imageUrl: (productForm.imageUrl?.trim() || ""),
       rating: Number.isNaN(numericRating) ? baseProduct.rating : Math.min(Math.max(numericRating, 0), 5),
       price: Number.isNaN(numericPrice) ? baseProduct.price : Number(numericPrice.toFixed(2)),
       vipPromotionLabel: productForm.vipPromotionLabel.trim(),

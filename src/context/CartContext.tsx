@@ -8,14 +8,6 @@ type CartProduct = {
   image: string;
 };
 
-const optimizeImageUrl = (url: string): string => {
-  if (!url || url.length < 200) return url;
-  if (url.startsWith("data:image")) {
-    return "/placeholder.svg";
-  }
-  return url;
-};
-
 export type CartItem = CartProduct & {
   quantity: number;
 };
@@ -46,7 +38,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
         return [];
       }
       
-      if (stored.length > 1000000) {
+      if (stored.length > 5000000) {
         console.warn("[Cart] Stored cart data too large, clearing");
         localStorage.removeItem(STORAGE_KEY);
         return [];
@@ -60,27 +52,12 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       
       const limitedItems = parsed.slice(0, 50);
       
-      const optimizedItems = limitedItems.map((item) => ({
-        ...item,
-        image: optimizeImageUrl(item.image || "/placeholder.svg"),
-      }));
-      
-      if (limitedItems.length < parsed.length || optimizedItems.some((item, idx) => item.image !== limitedItems[idx]?.image)) {
-        console.warn(`[Cart] Optimizing cart data`);
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(optimizedItems));
-        } catch {
-          // If save fails, just return optimized items
-        }
-      }
-      
-      return optimizedItems;
+      return limitedItems;
     } catch (error) {
       console.error("[Cart] Error loading cart from localStorage:", error);
       try {
         localStorage.removeItem(STORAGE_KEY);
       } catch {
-        // Ignore cleanup errors
       }
       return [];
     }
@@ -92,7 +69,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const serialized = JSON.stringify(items);
       
-      if (serialized.length > 1000000) {
+      if (serialized.length > 5000000) {
         console.warn("[Cart] Cart data too large, clearing old data");
         localStorage.removeItem(STORAGE_KEY);
         setItems([]);
@@ -132,12 +109,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
         );
       }
       
-      const optimizedProduct = {
-        ...product,
-        image: optimizeImageUrl(product.image),
-      };
-      
-      return [...prev, { ...optimizedProduct, quantity }];
+      return [...prev, { ...product, quantity }];
     });
   };
 

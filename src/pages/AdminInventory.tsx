@@ -354,7 +354,7 @@ const AdminInventory = () => {
       id: activeProduct?.id ?? crypto.randomUUID(),
       name: productForm.name.trim(),
       description: productForm.description.trim(),
-      imageUrl: productForm.imageUrl.trim(),
+      imageUrl: (productForm.imageUrl?.trim() || ""),
       rating: Number.isNaN(numericRating) ? 0 : Math.min(Math.max(numericRating, 0), 5),
       price: Number.isNaN(numericPrice) ? 0 : Number(numericPrice.toFixed(2)),
       quantity: Math.max(0, numericQuantity),
@@ -735,26 +735,8 @@ const AdminInventory = () => {
                             placeholder="Quantidade mínima"
                           />
                         </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="product-vip-discount">Desconto VIP (%)</Label>
-                          <Input
-                            id="product-vip-discount"
-                            value={productForm.vipDiscount}
-                            onChange={(event) => handleProductFormChange("vipDiscount", event.target.value)}
-                            placeholder="0"
-                          />
-                        </div>
                       </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="product-vip-label">Texto promocional VIP</Label>
-                        <Input
-                          id="product-vip-label"
-                          value={productForm.vipPromotionLabel}
-                          onChange={(event) => handleProductFormChange("vipPromotionLabel", event.target.value)}
-                          placeholder="VIP: 20% OFF + mimo exclusivo"
-                        />
-                      </div>
 
                       <div className="rounded-lg border border-border bg-secondary/40 px-4 py-3 text-sm text-muted-foreground flex flex-col gap-2">
                         <div className="flex items-center gap-2">

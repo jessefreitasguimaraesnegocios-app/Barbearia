@@ -2,7 +2,8 @@ export type VipBillingCycle = "monthly" | "annual";
 export type VipPaymentStatus = "paid" | "pending" | "overdue";
 
 export interface VipConfig {
-  price: number;
+  priceMonthly: number;
+  priceAnnual: number;
   billingCycle: VipBillingCycle;
   benefits: string[];
 }
@@ -26,7 +27,8 @@ export interface VipData {
 
 export const DEFAULT_VIP_DATA: VipData = {
   config: {
-    price: 199.9,
+    priceMonthly: 199.9,
+    priceAnnual: 500.0,
     billingCycle: "monthly",
     benefits: [
       "10% de desconto em todos os serviços",

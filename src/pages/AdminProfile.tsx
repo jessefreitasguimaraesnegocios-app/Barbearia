@@ -31,6 +31,17 @@ const AdminProfile = () => {
   const [showTermsDialog, setShowTermsDialog] = useState(false);
   const initializedRef = useRef(false);
 
+  const formatPhone = (value: string) => {
+    const numbers = value.replace(/\D/g, "").slice(0, 11);
+    if (numbers.length <= 2) {
+      return numbers.length > 0 ? `(${numbers}` : numbers;
+    } else if (numbers.length <= 7) {
+      return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+    } else {
+      return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
+    }
+  };
+
   useEffect(() => {
     const data = loadBarbershops();
     setBarbershops(data);
@@ -70,6 +81,80 @@ const AdminProfile = () => {
         item.id === selectedBarbershop.id ? { ...item, [field]: value } : item,
       ),
     );
+  };
+
+  const handleSave = () => {
+    if (!selectedBarbershop) {
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Nenhuma barbearia selecionada.",
+      });
+      return;
+    }
+
+    if (!selectedBarbershop.name.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Nome obrigatório",
+        description: "Preencha o nome da barbearia.",
+      });
+      return;
+    }
+
+    if (!selectedBarbershop.email.trim()) {
+      toast({
+        variant: "destructive",
+        title: "E-mail obrigatório",
+        description: "Preencha o e-mail da barbearia.",
+      });
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(selectedBarbershop.email.trim())) {
+      toast({
+        variant: "destructive",
+        title: "E-mail inválido",
+        description: "Informe um e-mail válido.",
+      });
+      return;
+    }
+
+    if (!selectedBarbershop.address.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Endereço obrigatório",
+        description: "Preencha o endereço da barbearia.",
+      });
+      return;
+    }
+
+    const phoneNumbers = selectedBarbershop.phone.replace(/\D/g, "");
+    if (phoneNumbers.length !== 11) {
+      toast({
+        variant: "destructive",
+        title: "Telefone inválido",
+        description: "O telefone deve conter exatamente 11 dígitos (DDD + 9 dígitos).",
+      });
+      return;
+    }
+
+    if (!selectedBarbershop.hours.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Horário obrigatório",
+        description: "Preencha o horário de funcionamento.",
+      });
+      return;
+    }
+
+    persistBarbershops(barbershops);
+
+    toast({
+      title: "Salvo com sucesso",
+      description: "As informações da barbearia foram salvas.",
+    });
   };
 
   const handleRatingChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -392,9 +477,11 @@ const AdminProfile = () => {
                         <Label htmlFor="barbershop-phone">Telefone</Label>
                         <Input
                           id="barbershop-phone"
+                          type="tel"
                           value={selectedBarbershop.phone}
-                          onChange={(event) => handleUpdate("phone", event.target.value)}
+                          onChange={(event) => handleUpdate("phone", formatPhone(event.target.value))}
                           placeholder="(11) 90000-0000"
+                          maxLength={15}
                         />
                       </div>
                       <div className="space-y-2">
@@ -437,6 +524,15 @@ const AdminProfile = () => {
                         onCheckedChange={(checked) => handleUpdate("isOpen", checked)}
                       />
                     </div>
+
+                    <Button
+                      type="button"
+                      variant="hero"
+                      className="w-full"
+                      onClick={handleSave}
+                    >
+                      Salvar
+                    </Button>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <Card className="border-border bg-secondary/40">

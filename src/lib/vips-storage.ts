@@ -43,9 +43,12 @@ const isValidData = (entry: unknown): entry is VipData => {
   if (
     !typed.config ||
     typeof typed.config !== "object" ||
-    typeof typed.config.price !== "number" ||
-    Number.isNaN(typed.config.price) ||
-    typed.config.price < 0 ||
+    typeof typed.config.priceMonthly !== "number" ||
+    Number.isNaN(typed.config.priceMonthly) ||
+    typed.config.priceMonthly < 0 ||
+    typeof typed.config.priceAnnual !== "number" ||
+    Number.isNaN(typed.config.priceAnnual) ||
+    typed.config.priceAnnual < 0 ||
     typeof typed.config.billingCycle !== "string" ||
     !VALID_BILLING_CYCLES.includes(typed.config.billingCycle as VipBillingCycle) ||
     !Array.isArray(typed.config.benefits) ||
@@ -63,7 +66,8 @@ const isValidData = (entry: unknown): entry is VipData => {
 
 const sanitizeData = (data: VipData): VipData => ({
   config: {
-    price: Number(data.config.price.toFixed(2)),
+    priceMonthly: Number(data.config.priceMonthly.toFixed(2)),
+    priceAnnual: Number(data.config.priceAnnual.toFixed(2)),
     billingCycle: data.config.billingCycle,
     benefits: data.config.benefits.map((benefit) => benefit.trim()).filter(Boolean),
   },

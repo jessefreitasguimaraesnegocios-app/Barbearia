@@ -136,12 +136,17 @@ const Shop = () => {
   const handleAddToCart = (product: (typeof displayProducts)[number]) => {
     const numericId = Number(product.id.toString().replace(/[^\d]/g, "")) || displayProducts.indexOf(product) + 1;
 
+    let productImage = product.imageUrl?.trim() || "";
+    if (!productImage || productImage.length === 0) {
+      productImage = PLACEHOLDER_IMAGE;
+    }
+
     addItem({
       id: numericId,
       name: product.name,
       priceLabel: currencyFormatter.format(product.price),
       priceValue: product.price,
-      image: product.imageUrl || PLACEHOLDER_IMAGE,
+      image: productImage,
     });
 
     toast({

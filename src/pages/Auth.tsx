@@ -63,6 +63,45 @@ const Auth = () => {
   const [signupPassword, setSignupPassword] = useState("");
   const [signupConfirm, setSignupConfirm] = useState("");
 
+  const formatCNPJ = (value: string) => {
+    const numbers = value.replace(/\D/g, "").slice(0, 14);
+    if (numbers.length <= 2) {
+      return numbers;
+    } else if (numbers.length <= 5) {
+      return `${numbers.slice(0, 2)}.${numbers.slice(2)}`;
+    } else if (numbers.length <= 8) {
+      return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5)}`;
+    } else if (numbers.length <= 12) {
+      return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5, 8)}/${numbers.slice(8)}`;
+    } else {
+      return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5, 8)}/${numbers.slice(8, 12)}-${numbers.slice(12, 14)}`;
+    }
+  };
+
+  const formatCPF = (value: string) => {
+    const numbers = value.replace(/\D/g, "").slice(0, 11);
+    if (numbers.length <= 3) {
+      return numbers;
+    } else if (numbers.length <= 6) {
+      return `${numbers.slice(0, 3)}.${numbers.slice(3)}`;
+    } else if (numbers.length <= 9) {
+      return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6)}`;
+    } else {
+      return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6, 9)}-${numbers.slice(9, 11)}`;
+    }
+  };
+
+  const formatPhone = (value: string) => {
+    const numbers = value.replace(/\D/g, "").slice(0, 11);
+    if (numbers.length <= 2) {
+      return numbers.length > 0 ? `(${numbers}` : numbers;
+    } else if (numbers.length <= 7) {
+      return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+    } else {
+      return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
+    }
+  };
+
   useEffect(() => {
     const handleStorage = (event: StorageEvent) => {
       if (event.key === "barberbook_admin_collaborators") {
@@ -155,6 +194,21 @@ const Auth = () => {
         return;
       }
 
+      const phoneNumbers = signupWhatsapp.replace(/\D/g, "");
+      const cpfNumbers = signupCpf.replace(/\D/g, "");
+
+      if (cpfNumbers.length !== 11) {
+        setIsLoading(false);
+        toast.error("CPF deve conter exatamente 11 dígitos");
+        return;
+      }
+
+      if (phoneNumbers.length !== 11) {
+        setIsLoading(false);
+        toast.error("WhatsApp deve conter exatamente 11 dígitos (DDD + 9 dígitos)");
+        return;
+      }
+
       const id =
         (typeof crypto !== "undefined" && "randomUUID" in crypto && crypto.randomUUID()) ||
         `c_${Math.random().toString(36).slice(2, 10)}`;
@@ -162,9 +216,9 @@ const Auth = () => {
       const newCollaborator: Collaborator = {
         id,
         name: signupResponsavel.trim(),
-        phone: signupWhatsapp.trim(),
+        phone: phoneNumbers,
         email,
-        cpf: signupCpf.trim(),
+        cpf: cpfNumbers,
         password: hashPassword(signupPassword),
         role: "socio",
         specialty: "",
@@ -223,8 +277,7 @@ const Auth = () => {
                         required
                         value={loginEmail}
                         onChange={(event) => setLoginEmail(event.target.value)}
-                      value={signupCompany}
-                      onChange={(e) => setSignupCompany(e.target.value)} />
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="login-password">Senha</Label>
@@ -237,8 +290,7 @@ const Auth = () => {
                           className="pr-10"
                           value={loginPassword}
                           onChange={(event) => setLoginPassword(event.target.value)}
-                        value={signupCnpj}
-                        onChange={(e) => setSignupCnpj(e.target.value)} />
+                        />
                         <button
                           type="button"
                           onClick={() => setShowLoginPassword(!showLoginPassword)}
@@ -299,6 +351,8 @@ const Auth = () => {
                         type="text"
                         placeholder="Nome fantasia"
                         required
+                        value={signupCompany}
+                        onChange={(e) => setSignupCompany(e.target.value)}
                       />
                     </div>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -308,9 +362,10 @@ const Auth = () => {
                           id="signup-cnpj"
                           type="text"
                           placeholder="00.000.000/0000-00"
-                          required
-                        value={signupResponsavel}
-                        onChange={(e) => setSignupResponsavel(e.target.value)} />
+                          value={signupCnpj}
+                          onChange={(e) => setSignupCnpj(formatCNPJ(e.target.value))}
+                          maxLength={18}
+                        />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="signup-responsavel">Responsável</Label>
@@ -319,8 +374,9 @@ const Auth = () => {
                           type="text"
                           placeholder="Nome completo do responsável"
                           required
-                        value={signupCpf}
-                        onChange={(e) => setSignupCpf(e.target.value)} />
+                          value={signupResponsavel}
+                          onChange={(e) => setSignupResponsavel(e.target.value)}
+                        />
                       </div>
                     </div>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -331,8 +387,10 @@ const Auth = () => {
                           type="text"
                           placeholder="000.000.000-00"
                           required
-                        value={signupWhatsapp}
-                        onChange={(e) => setSignupWhatsapp(e.target.value)} />
+                          value={signupCpf}
+                          onChange={(e) => setSignupCpf(formatCPF(e.target.value))}
+                          maxLength={14}
+                        />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="signup-whatsapp">WhatsApp</Label>
@@ -341,6 +399,9 @@ const Auth = () => {
                           type="tel"
                           placeholder="(00) 00000-0000"
                           required
+                          value={signupWhatsapp}
+                          onChange={(e) => setSignupWhatsapp(formatPhone(e.target.value))}
+                          maxLength={15}
                         />
                       </div>
                     </div>

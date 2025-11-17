@@ -64,9 +64,15 @@ const Cart = () => {
                     <CardContent className="flex flex-col md:flex-row gap-6 py-6">
                       <div className="h-32 w-full md:w-32 overflow-hidden rounded-xl bg-secondary">
                         <img
-                          src={item.image}
+                          src={item.image || "/placeholder.svg"}
                           alt={item.name}
                           className="h-full w-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            if (target.src !== "/placeholder.svg") {
+                              target.src = "/placeholder.svg";
+                            }
+                          }}
                         />
                       </div>
                       <div className="flex-1 space-y-3">

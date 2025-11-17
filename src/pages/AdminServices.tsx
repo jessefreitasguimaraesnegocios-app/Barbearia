@@ -68,8 +68,18 @@ const AdminServices = () => {
     }
   }, [isReordering]);
 
+  const formatDuration = (value: string) => {
+    const numbers = value.replace(/\D/g, "");
+    return numbers;
+  };
+
   const handleInputChange = (field: keyof ServiceFormState) => (value: string) => {
-    setFormState((previous) => ({ ...previous, [field]: value }));
+    if (field === "duration") {
+      const numbersOnly = formatDuration(value);
+      setFormState((previous) => ({ ...previous, [field]: numbersOnly }));
+    } else {
+      setFormState((previous) => ({ ...previous, [field]: value }));
+    }
   };
 
   const handlePromotionChange = (value: PromotionScope) => {
@@ -109,79 +119,91 @@ const AdminServices = () => {
     event.preventDefault();
     setIsSubmitting(true);
 
-    const numericPrice = parsePrice(formState.price);
+    try {
+      const numericPrice = parsePrice(formState.price);
 
-    if (Number.isNaN(numericPrice)) {
-      toast({
-        variant: "destructive",
-        title: "Preço inválido",
-        description: "Informe um valor numérico maior que zero.",
-      });
-      setIsSubmitting(false);
-      return;
-    }
-
-    const features = parseFeatures(formState.features);
-    let discountValue: number | null = null;
-
-    if (formState.promotionScope !== "none") {
-      const parsedDiscount = Number(formState.discountPercentage);
-
-      if (
-        Number.isNaN(parsedDiscount) ||
-        parsedDiscount <= 0 ||
-        parsedDiscount > 100 ||
-        parsedDiscount % 5 !== 0
-      ) {
+      if (Number.isNaN(numericPrice)) {
         toast({
           variant: "destructive",
-          title: "Desconto inválido",
-          description: "Selecione uma porcentagem entre 5% e 100%, em incrementos de 5%.",
+          title: "Preço inválido",
+          description: "Informe um valor numérico maior que zero.",
         });
         setIsSubmitting(false);
         return;
       }
 
-      discountValue = parsedDiscount;
-    }
+      const features = parseFeatures(formState.features);
+      let discountValue: number | null = null;
 
-    const newService: ServiceItem = {
-      id: crypto.randomUUID(),
-      title: formState.title.trim(),
-      price: numericPrice,
-      duration: formState.duration.trim(),
-      description: formState.description.trim(),
-      features,
-      promotionScope: formState.promotionScope,
-      discountPercentage: discountValue,
-    };
+      if (formState.promotionScope !== "none") {
+        const parsedDiscount = Number(formState.discountPercentage);
 
-    if (!newService.title || !newService.duration || !newService.description) {
+        if (
+          Number.isNaN(parsedDiscount) ||
+          parsedDiscount <= 0 ||
+          parsedDiscount > 100 ||
+          parsedDiscount % 5 !== 0
+        ) {
+          toast({
+            variant: "destructive",
+            title: "Desconto inválido",
+            description: "Selecione uma porcentagem entre 5% e 100%, em incrementos de 5%.",
+          });
+          setIsSubmitting(false);
+          return;
+        }
+
+        discountValue = parsedDiscount;
+      }
+
+      if (!formState.title.trim() || !formState.duration.trim() || !formState.description.trim()) {
+        toast({
+          variant: "destructive",
+          title: "Campos obrigatórios",
+          description: "Preencha título, duração e descrição do serviço.",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      const durationValue = formState.duration.trim() ? `${formState.duration.trim()} min` : "";
+
+      const newService: ServiceItem = {
+        id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `service-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        title: formState.title.trim(),
+        price: numericPrice,
+        duration: durationValue,
+        description: formState.description.trim(),
+        features,
+        promotionScope: formState.promotionScope,
+        discountPercentage: discountValue,
+      };
+
+      const updatedServices = [...services, newService];
+      setServices(updatedServices);
+      persistServices(updatedServices);
+
+      toast({
+        title: "Serviço cadastrado",
+        description: `${newService.title} foi adicionado à listagem.`,
+        action: (
+          <Button variant="outline" size="sm" onClick={() => navigate("/services")}>
+            Ver página
+          </Button>
+        ),
+      });
+
+      resetForm();
+      setIsSubmitting(false);
+    } catch (error) {
+      console.error("Erro ao adicionar serviço:", error);
       toast({
         variant: "destructive",
-        title: "Campos obrigatórios",
-        description: "Preencha título, duração e descrição do serviço.",
+        title: "Erro ao cadastrar",
+        description: "Ocorreu um erro ao adicionar o serviço. Tente novamente.",
       });
       setIsSubmitting(false);
-      return;
     }
-
-    const updatedServices = [...services, newService];
-    setServices(updatedServices);
-    persistServices(updatedServices);
-
-    toast({
-      title: "Serviço cadastrado",
-      description: `${newService.title} foi adicionado à listagem.`,
-      action: (
-        <Button variant="outline" size="sm" onClick={() => navigate("/services")}>
-          Ver página
-        </Button>
-      ),
-    });
-
-    resetForm();
-    setIsSubmitting(false);
   };
 
   const handleDeleteService = (serviceId: string) => {
@@ -346,13 +368,22 @@ const AdminServices = () => {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="service-duration">Duração</Label>
-                      <Input
-                        id="service-duration"
-                        value={formState.duration}
-                        onChange={(event) => handleInputChange("duration")(event.target.value)}
-                        placeholder="Ex.: 45 min"
-                        required
-                      />
+                      <div className="relative">
+                        <Input
+                          id="service-duration"
+                          type="text"
+                          inputMode="numeric"
+                          value={formState.duration}
+                          onChange={(event) => handleInputChange("duration")(event.target.value)}
+                          placeholder="Ex.: 45"
+                          className="pr-12"
+                          maxLength={3}
+                          required
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
+                          min
+                        </span>
+                      </div>
                     </div>
                   </div>
                   <div className="space-y-2">

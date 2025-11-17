@@ -26,7 +26,7 @@ const isValidStoreProduct = (entry: unknown): entry is StoreProduct => {
     typeof typed.id === "string" &&
     typeof typed.name === "string" &&
     typeof typed.description === "string" &&
-    typeof typed.imageUrl === "string" &&
+    (typeof typed.imageUrl === "string" || typed.imageUrl === null || typed.imageUrl === undefined) &&
     typeof typed.rating === "number" &&
     Number.isFinite(typed.rating) &&
     typed.rating >= 0 &&
@@ -51,6 +51,7 @@ const isValidStoreProduct = (entry: unknown): entry is StoreProduct => {
 
 const sanitizeStoreProduct = (product: StoreProduct): StoreProduct => ({
   ...product,
+  imageUrl: product.imageUrl?.trim() || "",
   rating: Number(product.rating.toFixed(1)),
   price: Number(product.price.toFixed(2)),
   quantity: Math.max(0, Math.floor(product.quantity)),
