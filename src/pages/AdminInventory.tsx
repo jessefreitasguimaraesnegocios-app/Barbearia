@@ -128,10 +128,10 @@ const AdminInventory = () => {
       setActiveBarbershopId(resolvedBarbershopId);
 
       const data = loadInventory(resolvedBarbershopId);
-      setInventory(data);
-      setActiveProductId(data.storeProducts[0]?.id ?? null);
-      setActiveConsumableId(data.consumables[0]?.id ?? null);
-      initializedRef.current = true;
+    setInventory(data);
+    setActiveProductId(data.storeProducts[0]?.id ?? null);
+    setActiveConsumableId(data.consumables[0]?.id ?? null);
+    initializedRef.current = true;
     };
 
     loadData();

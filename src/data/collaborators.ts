@@ -1,7 +1,7 @@
 import { hashPassword } from "@/lib/password";
 
-export type CollaboratorRole = "barbeiro" | "barbeiro-junior" | "faxineira" | "socio" | "atendente";
-export type PaymentMethod = "salario-fixo" | "aluguel-cadeira-100" | "aluguel-cadeira-50";
+export type CollaboratorRole = "barbeiro" | "barbeiro-junior" | "faxineira" | "socio" | "atendente" | "socio-barbeiro" | "dono-barbeiro" | "dono";
+export type PaymentMethod = "salario-fixo" | "aluguel-cadeira-100" | "aluguel-cadeira-50" | "recebe-100-por-cliente" | "recebe-50-por-cliente";
 
 export interface Collaborator {
   id: string;
@@ -49,8 +49,11 @@ export const DEFAULT_COLLABORATORS: Collaborator[] = [
 export const COLLABORATOR_ROLES: Array<{ value: CollaboratorRole; label: string }> = [
   { value: "barbeiro", label: "Barbeiro" },
   { value: "barbeiro-junior", label: "Barbeiro Júnior" },
+  { value: "socio-barbeiro", label: "Sócio/Barbeiro" },
+  { value: "dono-barbeiro", label: "Dono/Barbeiro" },
+  { value: "dono", label: "Dono" },
+  { value: "socio", label: "Sócio" },
   { value: "faxineira", label: "Faxineira" },
   { value: "atendente", label: "Atendente" },
-  { value: "socio", label: "Sócio" },
 ];
 

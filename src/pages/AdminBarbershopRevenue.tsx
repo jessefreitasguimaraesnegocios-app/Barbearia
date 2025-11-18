@@ -205,7 +205,11 @@ const AdminBarbershopRevenue = () => {
   const barbersWithChairRental = useMemo(() => {
     const barberIds = new Set<string>();
     collaborators.forEach((collaborator) => {
-      if (collaborator.paymentMethod === "aluguel-cadeira-100" || collaborator.paymentMethod === "aluguel-cadeira-50") {
+      const paymentMethod = collaborator.paymentMethod;
+      const is100Percent = paymentMethod === "aluguel-cadeira-100" || paymentMethod === "recebe-100-por-cliente";
+      const is50Percent = paymentMethod === "aluguel-cadeira-50" || paymentMethod === "recebe-50-por-cliente";
+      
+      if (is100Percent || is50Percent) {
         barberIds.add(collaborator.id);
         barberIds.add(getBarberIdFromCollaborator(collaborator));
       }
@@ -238,7 +242,11 @@ const AdminBarbershopRevenue = () => {
     let totalRental = 0;
     
     collaborators.forEach((collaborator) => {
-      if (collaborator.paymentMethod === "aluguel-cadeira-100" || collaborator.paymentMethod === "aluguel-cadeira-50") {
+      const paymentMethod = collaborator.paymentMethod;
+      const is100Percent = paymentMethod === "aluguel-cadeira-100" || paymentMethod === "recebe-100-por-cliente";
+      const is50Percent = paymentMethod === "aluguel-cadeira-50" || paymentMethod === "recebe-50-por-cliente";
+      
+      if (is100Percent || is50Percent) {
         const barberId = collaborator.id;
         const barberSlug = getBarberIdFromCollaborator(collaborator);
         
@@ -248,9 +256,9 @@ const AdminBarbershopRevenue = () => {
         
         const barberRevenue = barberAppointments.reduce((sum, apt) => sum + apt.price, 0);
         
-        if (collaborator.paymentMethod === "aluguel-cadeira-100") {
+        if (is100Percent) {
           totalRental += barberRevenue;
-        } else if (collaborator.paymentMethod === "aluguel-cadeira-50") {
+        } else if (is50Percent) {
           totalRental += barberRevenue * 0.5;
         }
       }

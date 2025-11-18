@@ -341,7 +341,7 @@ const Booking = () => {
 
   const barbers = useMemo(() => {
     const barberCollaborators = collaborators.filter(
-      (c) => c.role === "barbeiro" || c.role === "barbeiro-junior"
+      (c) => c.role.includes("barbeiro")
     );
 
     if (barberCollaborators.length === 0) {

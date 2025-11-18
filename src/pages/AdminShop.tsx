@@ -155,7 +155,7 @@ const AdminShop = () => {
     const barbershopId = storedActiveId || activeBarbershopId;
     
     const timeoutId = setTimeout(() => {
-      persistInventory(inventory, barbershopId);
+    persistInventory(inventory, barbershopId);
     }, 300);
     
     return () => clearTimeout(timeoutId);
@@ -349,10 +349,10 @@ const AdminShop = () => {
           : `${sanitizedProduct.name} foi salvo como rascunho. Selecione uma categoria para publicar na loja.`,
       });
     } else {
-      toast({
-        title: "Produto salvo",
-        description: `${sanitizedProduct.name} foi ${activeProduct ? "atualizado" : "adicionado"} à vitrine.`,
-      });
+    toast({
+      title: "Produto salvo",
+      description: `${sanitizedProduct.name} foi ${activeProduct ? "atualizado" : "adicionado"} à vitrine.`,
+    });
     }
   };
 
@@ -657,10 +657,10 @@ const AdminShop = () => {
               <Plus className="h-4 w-4" />
               ADD Produto
             </Button>
-            <Button variant="secondary" size="sm" onClick={addNewProduct}>
+          <Button variant="secondary" size="sm" onClick={addNewProduct}>
               <Plus className="h-4 w-4" />
               ADD Produto
-            </Button>
+          </Button>
           </div>
         </div>
         {!activeProduct && (

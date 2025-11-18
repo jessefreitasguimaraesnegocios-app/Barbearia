@@ -21,7 +21,7 @@ const isValidCollaborator = (entry: unknown): entry is Collaborator => {
     typeof typed.cpf === "string" &&
     typeof typed.password === "string" &&
     typeof typed.role === "string" &&
-    ["barbeiro", "barbeiro-junior", "faxineira", "socio", "atendente"].includes(typed.role) &&
+    ["barbeiro", "barbeiro-junior", "socio-barbeiro", "dono-barbeiro", "dono", "faxineira", "socio", "atendente"].includes(typed.role) &&
     typeof typed.specialty === "string" &&
     typeof typed.createdAt === "string" &&
     (typed.photoUrl === undefined || typeof typed.photoUrl === "string") &&

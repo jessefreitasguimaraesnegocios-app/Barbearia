@@ -25,6 +25,7 @@ interface CollaboratorFormState {
   paymentMethod: PaymentMethod | "";
   photoUrl: string;
   experience: string;
+  workSchedule: string;
 }
 
 const INITIAL_FORM_STATE: CollaboratorFormState = {
@@ -38,6 +39,7 @@ const INITIAL_FORM_STATE: CollaboratorFormState = {
   paymentMethod: "",
   photoUrl: "",
   experience: "",
+  workSchedule: "",
 };
 
 const AdminCollaborators = () => {
@@ -67,19 +69,50 @@ const AdminCollaborators = () => {
     [collaborators, activeId],
   );
 
+  const formatCPF = (value: string) => {
+    const numbers = value.replace(/\D/g, "");
+    if (numbers.length <= 11) {
+      if (numbers.length <= 3) {
+        return numbers;
+      } else if (numbers.length <= 6) {
+        return `${numbers.slice(0, 3)}.${numbers.slice(3)}`;
+      } else if (numbers.length <= 9) {
+        return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6)}`;
+      } else {
+        return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6, 9)}-${numbers.slice(9, 11)}`;
+      }
+    }
+    return value;
+  };
+
+  const formatPhone = (value: string) => {
+    const numbers = value.replace(/\D/g, "");
+    if (numbers.length <= 11) {
+      if (numbers.length <= 2) {
+        return numbers.length > 0 ? `(${numbers}` : numbers;
+      } else if (numbers.length <= 7) {
+        return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+      } else {
+        return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
+      }
+    }
+    return value;
+  };
+
   useEffect(() => {
     if (selectedCollaborator) {
       setFormState({
         name: selectedCollaborator.name,
-        phone: selectedCollaborator.phone,
+        phone: formatPhone(selectedCollaborator.phone || ""),
         email: selectedCollaborator.email,
-        cpf: selectedCollaborator.cpf,
+        cpf: formatCPF(selectedCollaborator.cpf || ""),
         role: selectedCollaborator.role,
         specialty: selectedCollaborator.specialty || "",
         password: "",
         paymentMethod: selectedCollaborator.paymentMethod || "",
         photoUrl: selectedCollaborator.photoUrl || "",
         experience: selectedCollaborator.experience || "",
+        workSchedule: selectedCollaborator.workSchedule || "",
       });
     } else {
       setFormState(INITIAL_FORM_STATE);
@@ -168,6 +201,7 @@ const AdminCollaborators = () => {
                 paymentMethod: formState.paymentMethod || undefined,
                 photoUrl: formState.photoUrl.trim() || undefined,
                 experience: formState.experience.trim() || undefined,
+                workSchedule: formState.workSchedule.trim() || undefined,
               }
             : collaborator,
         ),
@@ -192,6 +226,7 @@ const AdminCollaborators = () => {
       paymentMethod: formState.paymentMethod || undefined,
       photoUrl: formState.photoUrl.trim() || undefined,
       experience: formState.experience.trim() || undefined,
+      workSchedule: formState.workSchedule.trim() || undefined,
       createdAt: new Date().toISOString(),
     };
 
@@ -327,19 +362,19 @@ const AdminCollaborators = () => {
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="font-semibold flex items-center gap-2">
-                                {collaborator.name}
-                              </p>
-                              <span className="text-xs text-muted-foreground flex items-center gap-2">
-                                <Mail className="h-3 w-3 text-muted-foreground" />
-                                {collaborator.email}
+                            <p className="font-semibold flex items-center gap-2">
+                              {collaborator.name}
+                            </p>
+                            <span className="text-xs text-muted-foreground flex items-center gap-2">
+                              <Mail className="h-3 w-3 text-muted-foreground" />
+                              {collaborator.email}
+                            </span>
+                            {collaborator.specialty && (
+                              <span className="text-xs text-muted-foreground flex items-center gap-2 mt-1">
+                                <Shield className="h-3 w-3 text-muted-foreground" />
+                                {collaborator.specialty}
                               </span>
-                              {collaborator.specialty && (
-                                <span className="text-xs text-muted-foreground flex items-center gap-2 mt-1">
-                                  <Shield className="h-3 w-3 text-muted-foreground" />
-                                  {collaborator.specialty}
-                                </span>
-                              )}
+                            )}
                               {collaborator.experience && (
                                 <span className="text-xs text-muted-foreground flex items-center gap-2 mt-1">
                                   <Shield className="h-3 w-3 text-muted-foreground" />
@@ -522,9 +557,11 @@ const AdminCollaborators = () => {
                       <Label htmlFor="collaborator-phone">Telefone</Label>
                       <Input
                         id="collaborator-phone"
+                        type="tel"
                         value={formState.phone}
-                        onChange={(event) => handleInputChange("phone", event.target.value)}
+                        onChange={(event) => handleInputChange("phone", formatPhone(event.target.value))}
                         placeholder="(11) 90000-0000"
+                        maxLength={15}
                       />
                     </div>
                   </div>
@@ -534,9 +571,11 @@ const AdminCollaborators = () => {
                       <Label htmlFor="collaborator-cpf">CPF</Label>
                       <Input
                         id="collaborator-cpf"
+                        type="text"
                         value={formState.cpf}
-                        onChange={(event) => handleInputChange("cpf", event.target.value)}
+                        onChange={(event) => handleInputChange("cpf", formatCPF(event.target.value))}
                         placeholder="000.000.000-00"
+                        maxLength={14}
                         required
                       />
                     </div>
@@ -553,6 +592,8 @@ const AdminCollaborators = () => {
                           <SelectItem value="salario-fixo">Salário Fixo</SelectItem>
                           <SelectItem value="aluguel-cadeira-100">Aluguel de Cadeira - Recebe 100% por cliente</SelectItem>
                           <SelectItem value="aluguel-cadeira-50">Aluguel de Cadeira - Recebe 50% por cliente</SelectItem>
+                          <SelectItem value="recebe-100-por-cliente">Recebe 100% por cliente</SelectItem>
+                          <SelectItem value="recebe-50-por-cliente">Recebe 50% por cliente</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

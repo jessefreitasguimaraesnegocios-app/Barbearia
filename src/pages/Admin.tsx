@@ -335,19 +335,19 @@ const Admin = () => {
                     </p>
                   ) : (
                     todayAppointments.map((booking, index) => (
-                      <div key={index} className="flex items-center justify-between p-4 bg-secondary rounded-lg">
-                        <div>
-                          <div className="font-semibold">{booking.client}</div>
-                          <div className="text-sm text-muted-foreground">{booking.service}</div>
-                        </div>
-                        <div className="text-right">
-                          <div className="flex items-center text-primary font-semibold">
-                            <Clock className="h-4 w-4 mr-1" />
-                            {booking.time}
-                          </div>
-                          <div className="text-sm text-muted-foreground">{booking.barber}</div>
-                        </div>
+                    <div key={index} className="flex items-center justify-between p-4 bg-secondary rounded-lg">
+                      <div>
+                        <div className="font-semibold">{booking.client}</div>
+                        <div className="text-sm text-muted-foreground">{booking.service}</div>
                       </div>
+                      <div className="text-right">
+                        <div className="flex items-center text-primary font-semibold">
+                          <Clock className="h-4 w-4 mr-1" />
+                          {booking.time}
+                        </div>
+                        <div className="text-sm text-muted-foreground">{booking.barber}</div>
+                      </div>
+                    </div>
                     ))
                   )}
                 </div>

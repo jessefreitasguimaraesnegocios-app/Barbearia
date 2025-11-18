@@ -102,12 +102,12 @@ export const Navbar = () => {
               <ThemeToggle />
               {activeCollaborator?.role === "socio" ? (
                 <>
-                  <Link to="/admin">
-                    <Button variant="ghost" size="sm">
-                      <LayoutDashboard className="h-4 w-4 mr-2" />
-                      Admin
-                    </Button>
-                  </Link>
+                <Link to="/admin">
+                  <Button variant="ghost" size="sm">
+                    <LayoutDashboard className="h-4 w-4 mr-2" />
+                    Admin
+                  </Button>
+                </Link>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="outline" size="sm">
@@ -180,12 +180,12 @@ export const Navbar = () => {
                 <ThemeToggle />
                 {activeCollaborator?.role === "socio" && (
                   <>
-                    <Link to="/admin" onClick={() => setIsOpen(false)}>
-                      <Button variant="ghost" className="w-full justify-start">
-                        <LayoutDashboard className="h-4 w-4 mr-2" />
-                        Admin
-                      </Button>
-                    </Link>
+                  <Link to="/admin" onClick={() => setIsOpen(false)}>
+                    <Button variant="ghost" className="w-full justify-start">
+                      <LayoutDashboard className="h-4 w-4 mr-2" />
+                      Admin
+                    </Button>
+                  </Link>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button variant="outline" className="w-full justify-start" onClick={() => setIsOpen(false)}>

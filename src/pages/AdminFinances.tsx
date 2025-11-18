@@ -231,7 +231,11 @@ const AdminFinances = () => {
     let totalRental = 0;
     
     collaborators.forEach((collaborator) => {
-      if (collaborator.paymentMethod === "aluguel-cadeira-100" || collaborator.paymentMethod === "aluguel-cadeira-50") {
+      const paymentMethod = collaborator.paymentMethod;
+      const is100Percent = paymentMethod === "aluguel-cadeira-100" || paymentMethod === "recebe-100-por-cliente";
+      const is50Percent = paymentMethod === "aluguel-cadeira-50" || paymentMethod === "recebe-50-por-cliente";
+      
+      if (is100Percent || is50Percent) {
         const barberId = collaborator.id;
         const barberSlug = getBarberIdFromCollaborator(collaborator);
         
@@ -241,9 +245,9 @@ const AdminFinances = () => {
         
         const barberRevenue = barberAppointments.reduce((sum, apt) => sum + apt.price, 0);
         
-        if (collaborator.paymentMethod === "aluguel-cadeira-100") {
+        if (is100Percent) {
           totalRental += barberRevenue;
-        } else if (collaborator.paymentMethod === "aluguel-cadeira-50") {
+        } else if (is50Percent) {
           totalRental += barberRevenue * 0.5;
         }
       }
@@ -270,28 +274,40 @@ const AdminFinances = () => {
           amount: 0,
           type: "salario",
         });
-      } else if (collaborator.paymentMethod === "aluguel-cadeira-100" || collaborator.paymentMethod === "aluguel-cadeira-50") {
-        const barberId = collaborator.id;
-        const barberSlug = getBarberIdFromCollaborator(collaborator);
+      } else {
+        const paymentMethod = collaborator.paymentMethod;
+        const is100Percent = paymentMethod === "aluguel-cadeira-100" || paymentMethod === "recebe-100-por-cliente";
+        const is50Percent = paymentMethod === "aluguel-cadeira-50" || paymentMethod === "recebe-50-por-cliente";
         
-        const barberAppointments = barbershopRevenue.filter((apt) => 
-          apt.barberId === barberId || apt.barberId === barberSlug
-        );
-        
-        const barberRevenue = barberAppointments.reduce((sum, apt) => sum + apt.price, 0);
-        
-        if (collaborator.paymentMethod === "aluguel-cadeira-100") {
-          expenses.push({
-            name: `${collaborator.name} - Aluguel de Cadeira (100%)`,
-            amount: barberRevenue,
-            type: "aluguel",
-          });
-        } else if (collaborator.paymentMethod === "aluguel-cadeira-50") {
-          expenses.push({
-            name: `${collaborator.name} - Aluguel de Cadeira (50%)`,
-            amount: barberRevenue * 0.5,
-            type: "aluguel",
-          });
+        if (is100Percent || is50Percent) {
+          const barberId = collaborator.id;
+          const barberSlug = getBarberIdFromCollaborator(collaborator);
+          
+          const barberAppointments = barbershopRevenue.filter((apt) => 
+            apt.barberId === barberId || apt.barberId === barberSlug
+          );
+          
+          const barberRevenue = barberAppointments.reduce((sum, apt) => sum + apt.price, 0);
+          
+          if (is100Percent) {
+            const label = paymentMethod === "aluguel-cadeira-100" 
+              ? "Aluguel de Cadeira (100%)" 
+              : "Recebe 100% por cliente";
+            expenses.push({
+              name: `${collaborator.name} - ${label}`,
+              amount: barberRevenue,
+              type: "aluguel",
+            });
+          } else if (is50Percent) {
+            const label = paymentMethod === "aluguel-cadeira-50" 
+              ? "Aluguel de Cadeira (50%)" 
+              : "Recebe 50% por cliente";
+            expenses.push({
+              name: `${collaborator.name} - ${label}`,
+              amount: barberRevenue * 0.5,
+              type: "aluguel",
+            });
+          }
         }
       }
     });

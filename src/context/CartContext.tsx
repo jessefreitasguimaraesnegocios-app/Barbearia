@@ -90,21 +90,21 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
           console.error("[Cart] Cart data extremely large, this should not happen. Size:", serialized.length);
           // Não limpar o carrinho, apenas logar o erro
           isUpdatingRef.current = false;
-          return;
-        }
-        
-        localStorage.setItem(STORAGE_KEY, serialized);
+        return;
+      }
+      
+      localStorage.setItem(STORAGE_KEY, serialized);
         isUpdatingRef.current = false;
-      } catch (error) {
+    } catch (error) {
         isUpdatingRef.current = false;
-        if (error instanceof DOMException && error.name === "QuotaExceededError") {
+      if (error instanceof DOMException && error.name === "QuotaExceededError") {
           console.error("[Cart] localStorage quota exceeded");
           // Não limpar o carrinho automaticamente, apenas logar o erro
           // O usuário pode limpar manualmente se necessário
-        } else {
-          console.error("[Cart] Error saving cart to localStorage:", error);
-        }
+      } else {
+        console.error("[Cart] Error saving cart to localStorage:", error);
       }
+    }
     }, 300);
     
     return () => clearTimeout(timeoutId);

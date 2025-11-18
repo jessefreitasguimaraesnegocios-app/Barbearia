@@ -105,7 +105,7 @@ const CollaboratorDetails = () => {
       originalSetItem.apply(this, args);
       if (args[0]?.startsWith("bookingConfirmation")) {
         loadBookings();
-      }
+              }
     };
 
     return () => {
@@ -287,7 +287,7 @@ const CollaboratorDetails = () => {
                       />
                     ) : (
                       <div className="h-full w-full flex items-center justify-center bg-primary/10">
-                        <UserCircle className="h-20 w-20 text-primary" />
+                    <UserCircle className="h-20 w-20 text-primary" />
                       </div>
                     )}
                   </div>
@@ -401,7 +401,7 @@ const CollaboratorDetails = () => {
                       />
                     ) : (
                       <div className="h-full w-full flex items-center justify-center bg-primary/10">
-                        <UserCircle className="h-20 w-20 text-primary" />
+                    <UserCircle className="h-20 w-20 text-primary" />
                       </div>
                     )}
                   </div>
@@ -463,7 +463,7 @@ const CollaboratorDetails = () => {
                     {collaborator.workSchedule && (
                       <div className="flex items-center gap-3">
                         <Clock className="h-5 w-5 text-primary" />
-                        <div>
+                    <div>
                           <p className="text-sm text-muted-foreground">Horário de Trabalho</p>
                           <p className="font-semibold">{collaborator.workSchedule}</p>
                         </div>
