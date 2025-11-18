@@ -29,7 +29,7 @@ import {
   InventoryData,
   StoreProduct,
 } from "@/data/inventory";
-import { loadInventory, persistInventory, resetInventory } from "@/lib/inventory-storage";
+import { loadInventory, persistInventory } from "@/lib/inventory-storage";
 import { loadBarbershops } from "@/lib/barbershops-storage";
 import {
   AlertCircle,
@@ -40,7 +40,6 @@ import {
   Package,
   Percent,
   Plus,
-  RefreshCcw,
   Shield,
   ShoppingBag,
   Star,
@@ -546,19 +545,6 @@ const AdminInventory = () => {
     });
   };
 
-  const handleResetInventory = () => {
-    const storedActiveId = localStorage.getItem("admin_active_barbershop_id");
-    const barbershopId = storedActiveId || activeBarbershopId;
-    resetInventory(barbershopId);
-    const data = loadInventory(barbershopId);
-    setInventory(data);
-    setActiveProductId(data.storeProducts[0]?.id ?? null);
-    setActiveConsumableId(data.consumables[0]?.id ?? null);
-    toast({
-      title: "Estoque restaurado",
-      description: "Os dados padrão foram carregados novamente.",
-    });
-  };
 
   const addNewProduct = () => {
     setCurrentTab("store");
@@ -608,28 +594,6 @@ const AdminInventory = () => {
                 <Plus className="mr-2 h-4 w-4" />
                 Novo item de consumo
               </Button>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="outline">
-                    <RefreshCcw className="mr-2 h-4 w-4" />
-                    Restaurar padrão
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Restaurar estoque padrão?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Essa ação remove produtos e itens personalizados, voltando às configurações iniciais.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleResetInventory}>
-                      Confirmar
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
             </div>
           </div>
 

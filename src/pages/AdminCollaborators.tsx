@@ -12,7 +12,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Collaborator, COLLABORATOR_ROLES, CollaboratorRole, PaymentMethod, DEFAULT_COLLABORATORS } from "@/data/collaborators";
 import { loadCollaborators, persistCollaborators, resetCollaboratorsToDefault } from "@/lib/collaborators-storage";
 import { hashPassword } from "@/lib/password";
-import { ArrowLeft, Trash2, RefreshCcw, Plus, Shield, Mail, Phone, UserCircle, Eye } from "lucide-react";
+import { ArrowLeft, Trash2, RefreshCcw, Plus, Shield, Mail, Phone, UserCircle, Eye, User, Clock } from "lucide-react";
 
 interface CollaboratorFormState {
   name: string;
@@ -23,6 +23,8 @@ interface CollaboratorFormState {
   specialty: string;
   password: string;
   paymentMethod: PaymentMethod | "";
+  photoUrl: string;
+  experience: string;
 }
 
 const INITIAL_FORM_STATE: CollaboratorFormState = {
@@ -34,6 +36,8 @@ const INITIAL_FORM_STATE: CollaboratorFormState = {
   specialty: "",
   password: "",
   paymentMethod: "",
+  photoUrl: "",
+  experience: "",
 };
 
 const AdminCollaborators = () => {
@@ -71,9 +75,11 @@ const AdminCollaborators = () => {
         email: selectedCollaborator.email,
         cpf: selectedCollaborator.cpf,
         role: selectedCollaborator.role,
-        specialty: selectedCollaborator.specialty,
+        specialty: selectedCollaborator.specialty || "",
         password: "",
         paymentMethod: selectedCollaborator.paymentMethod || "",
+        photoUrl: selectedCollaborator.photoUrl || "",
+        experience: selectedCollaborator.experience || "",
       });
     } else {
       setFormState(INITIAL_FORM_STATE);
@@ -160,6 +166,8 @@ const AdminCollaborators = () => {
                 specialty: formState.specialty.trim(),
                 password: applyPassword(collaborator.password),
                 paymentMethod: formState.paymentMethod || undefined,
+                photoUrl: formState.photoUrl.trim() || undefined,
+                experience: formState.experience.trim() || undefined,
               }
             : collaborator,
         ),
@@ -182,6 +190,8 @@ const AdminCollaborators = () => {
       specialty: formState.specialty.trim(),
       password: hashPassword(formState.password || normalizedCpf),
       paymentMethod: formState.paymentMethod || undefined,
+      photoUrl: formState.photoUrl.trim() || undefined,
+      experience: formState.experience.trim() || undefined,
       createdAt: new Date().toISOString(),
     };
 
@@ -301,24 +311,50 @@ const AdminCollaborators = () => {
                             : "border-border hover:border-primary/50"
                         }`}
                       >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-semibold flex items-center gap-2">
-                              <UserCircle className="h-4 w-4 text-primary" />
-                              {collaborator.name}
-                            </p>
-                            <span className="text-xs text-muted-foreground flex items-center gap-2">
-                              <Mail className="h-3 w-3 text-muted-foreground" />
-                              {collaborator.email}
-                            </span>
-                            {collaborator.specialty && (
-                              <span className="text-xs text-muted-foreground flex items-center gap-2 mt-1">
-                                <Shield className="h-3 w-3 text-muted-foreground" />
-                                {collaborator.specialty}
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div className="h-12 w-12 rounded-full overflow-hidden bg-secondary border-2 border-primary flex-shrink-0">
+                              {collaborator.photoUrl ? (
+                                <img
+                                  src={collaborator.photoUrl}
+                                  alt={collaborator.name}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <div className="h-full w-full flex items-center justify-center bg-primary/10">
+                                  <User className="h-6 w-6 text-primary" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold flex items-center gap-2">
+                                {collaborator.name}
+                              </p>
+                              <span className="text-xs text-muted-foreground flex items-center gap-2">
+                                <Mail className="h-3 w-3 text-muted-foreground" />
+                                {collaborator.email}
                               </span>
-                            )}
+                              {collaborator.specialty && (
+                                <span className="text-xs text-muted-foreground flex items-center gap-2 mt-1">
+                                  <Shield className="h-3 w-3 text-muted-foreground" />
+                                  {collaborator.specialty}
+                                </span>
+                              )}
+                              {collaborator.experience && (
+                                <span className="text-xs text-muted-foreground flex items-center gap-2 mt-1">
+                                  <Shield className="h-3 w-3 text-muted-foreground" />
+                                  Experiência: {collaborator.experience}
+                                </span>
+                              )}
+                              {collaborator.workSchedule && (
+                                <span className="text-xs text-muted-foreground flex items-center gap-2 mt-1">
+                                  <Clock className="h-3 w-3 text-muted-foreground" />
+                                  {collaborator.workSchedule}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <Badge variant="outline">
+                          <Badge variant="outline" className="flex-shrink-0">
                             {
                               COLLABORATOR_ROLES.find((role) => role.value === collaborator.role)?.label ??
                               collaborator.role
@@ -350,6 +386,68 @@ const AdminCollaborators = () => {
               </CardHeader>
               <CardContent>
                 <form className="space-y-6" onSubmit={upsertCollaborator}>
+                  {selectedCollaborator && (
+                    <div className="flex flex-col items-center gap-4 mb-6 pb-6 border-b border-border">
+                      <div className="h-24 w-24 rounded-full overflow-hidden bg-secondary border-2 border-primary">
+                        {formState.photoUrl ? (
+                          <img
+                            src={formState.photoUrl}
+                            alt={formState.name || "Foto de perfil"}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="h-full w-full flex items-center justify-center">
+                            <User className="h-12 w-12 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                      <p className="font-semibold text-lg">{selectedCollaborator.name}</p>
+                      <div className="flex gap-2">
+                        <Label htmlFor="photo-upload" className="cursor-pointer">
+                          <Button variant="outline" size="sm" type="button" onClick={() => document.getElementById("photo-upload")?.click()}>
+                            {formState.photoUrl ? "Alterar foto" : "Adicionar foto"}
+                          </Button>
+                        </Label>
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          onChange={(event) => {
+                            if (!event.target.files || event.target.files.length === 0) {
+                              return;
+                            }
+                            const file = event.target.files[0];
+                            event.target.value = "";
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              const result = reader.result?.toString();
+                              if (result) {
+                                handleInputChange("photoUrl", result);
+                                toast({
+                                  title: "Foto carregada",
+                                  description: "Foto de perfil atualizada com sucesso.",
+                                });
+                              }
+                            };
+                            reader.onerror = () => {
+                              toast({
+                                variant: "destructive",
+                                title: "Falha ao carregar imagem",
+                                description: "Não foi possível processar o arquivo. Tente novamente.",
+                              });
+                            };
+                            reader.readAsDataURL(file);
+                          }}
+                          className="hidden"
+                          id="photo-upload"
+                        />
+                        {formState.photoUrl && (
+                          <Button variant="outline" size="sm" type="button" onClick={() => handleInputChange("photoUrl", "")}>
+                            Remover
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="collaborator-name">Nome completo</Label>
@@ -400,6 +498,24 @@ const AdminCollaborators = () => {
                         value={formState.specialty}
                         onChange={(event) => handleInputChange("specialty", event.target.value)}
                         placeholder="Ex.: Barbearia clássica, atendimento ao cliente"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="collaborator-experience">Experiência</Label>
+                      <Input
+                        id="collaborator-experience"
+                        value={formState.experience}
+                        onChange={(event) => handleInputChange("experience", event.target.value)}
+                        placeholder="Ex.: 8 anos, 5 anos de experiência"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="collaborator-workSchedule">Horário de Trabalho</Label>
+                      <Input
+                        id="collaborator-workSchedule"
+                        value={formState.workSchedule}
+                        onChange={(event) => handleInputChange("workSchedule", event.target.value)}
+                        placeholder="Ex.: de 8hs às 22hs"
                       />
                     </div>
                     <div className="space-y-2">

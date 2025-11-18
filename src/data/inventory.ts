@@ -10,7 +10,7 @@ export interface StoreProduct {
   vipDiscount: number;
   vipPromotionLabel: string;
   createdAt: string;
-  category?: "produtos" | "consumo" | "bebidas";
+  category?: "produtos" | "consumo" | "bebidas" | "rascunho";
 }
 
 export interface ConsumableItem {

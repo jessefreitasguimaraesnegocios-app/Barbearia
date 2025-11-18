@@ -38,9 +38,10 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
         return [];
       }
       
-      if (stored.length > 5000000) {
-        console.warn("[Cart] Stored cart data too large, clearing");
-        localStorage.removeItem(STORAGE_KEY);
+      // Limite muito maior para evitar limpeza desnecessária
+      if (stored.length > 50000000) {
+        console.error("[Cart] Stored cart data extremely large, this should not happen");
+        // Não limpar automaticamente, apenas logar
         return [];
       }
       
@@ -50,9 +51,8 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
         return [];
       }
       
-      const limitedItems = parsed.slice(0, 50);
-      
-      return limitedItems;
+      // Não limitar o número de itens - permitir todos os itens do carrinho
+      return parsed;
     } catch (error) {
       console.error("[Cart] Error loading cart from localStorage:", error);
       try {
@@ -63,60 +63,79 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     }
   });
   
-  const itemsRef = useRef<CartItem[]>(items);
+  const isUpdatingRef = useRef(false);
 
   useEffect(() => {
-    itemsRef.current = items;
-  }, [items]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || isUpdatingRef.current) return;
     
-    try {
-      const serialized = JSON.stringify(items);
-      
-      if (serialized.length > 5000000) {
-        console.warn("[Cart] Cart data too large, clearing old data");
-        localStorage.removeItem(STORAGE_KEY);
-        setItems([]);
-        return;
-      }
-      
-      localStorage.setItem(STORAGE_KEY, serialized);
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "QuotaExceededError") {
-        console.error("[Cart] localStorage quota exceeded, clearing cart");
-        try {
-          localStorage.removeItem(STORAGE_KEY);
-          localStorage.clear();
-        } catch (clearError) {
-          console.error("[Cart] Failed to clear localStorage:", clearError);
-        }
-        setItems([]);
-      } else {
-        console.error("[Cart] Error saving cart to localStorage:", error);
-      }
+    // Garantir que items é sempre um array válido
+    if (!Array.isArray(items)) {
+      return;
     }
+    
+    const timeoutId = setTimeout(() => {
+      // Verificar novamente se ainda está atualizando (pode ter mudado durante o timeout)
+      if (isUpdatingRef.current) return;
+      
+      try {
+        isUpdatingRef.current = true;
+        
+        // Capturar o estado atual dos items para garantir consistência
+        const currentItems = items;
+        const serialized = JSON.stringify(currentItems);
+        
+        // Limite muito maior (50MB) - um carrinho normal nunca chegaria perto disso
+        // Se chegar, provavelmente há um bug, mas não vamos limpar o carrinho
+        if (serialized.length > 50000000) {
+          console.error("[Cart] Cart data extremely large, this should not happen. Size:", serialized.length);
+          // Não limpar o carrinho, apenas logar o erro
+          isUpdatingRef.current = false;
+          return;
+        }
+        
+        localStorage.setItem(STORAGE_KEY, serialized);
+        isUpdatingRef.current = false;
+      } catch (error) {
+        isUpdatingRef.current = false;
+        if (error instanceof DOMException && error.name === "QuotaExceededError") {
+          console.error("[Cart] localStorage quota exceeded");
+          // Não limpar o carrinho automaticamente, apenas logar o erro
+          // O usuário pode limpar manualmente se necessário
+        } else {
+          console.error("[Cart] Error saving cart to localStorage:", error);
+        }
+      }
+    }, 300);
+    
+    return () => clearTimeout(timeoutId);
   }, [items]);
 
   const addItem = (product: CartProduct, quantity = 1): boolean => {
     let wasAdded = false;
+    
+    // Usar uma função de atualização que garante que o estado anterior seja preservado
     setItems((prev) => {
-      const existing = prev.find((item) => item.id === product.id);
-      if (existing) {
+      // Garantir que prev é sempre um array válido
+      const currentItems = Array.isArray(prev) ? prev : [];
+      
+      // Verificar se o produto já existe
+      const existingIndex = currentItems.findIndex((item) => item.id === product.id);
+      if (existingIndex !== -1) {
         wasAdded = false;
-        return prev;
+        return currentItems; // Retornar o array atual sem modificações
       }
       
-      let itemsToUpdate = prev;
-      if (itemsToUpdate.length >= 50) {
-        console.warn("[Cart] Cart limit reached (50 items), removing oldest item");
-        itemsToUpdate = itemsToUpdate.slice(1);
-      }
+      // Criar novo item e adicionar ao array
+      const newItem: CartItem = { ...product, quantity };
+      
+      // Sempre adicionar ao final, sem limite de 50 itens
+      // O limite de 50 estava causando problemas ao remover itens antigos
+      const updatedItems: CartItem[] = [...currentItems, newItem];
       
       wasAdded = true;
-      return [...itemsToUpdate, { ...product, quantity }];
+      return updatedItems;
     });
+    
     return wasAdded;
   };
 

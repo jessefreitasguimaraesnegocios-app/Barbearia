@@ -35,6 +35,11 @@ const Booking = () => {
   const [tempBarberId, setTempBarberId] = useState<string>("");
   const [tempTime, setTempTime] = useState<string>("");
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const [existingBookings, setExistingBookings] = useState<Array<{
+    barberId: string;
+    date: string;
+    time: string;
+  }>>([]);
   const currencyFormatter = useMemo(
     () => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }),
     []
@@ -79,12 +84,53 @@ const Booking = () => {
     }
   }, [navigate]);
 
+  const loadExistingBookings = () => {
+    const bookings: Array<{
+      barberId: string;
+      date: string;
+      time: string;
+    }> = [];
+
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith("bookingConfirmation")) {
+        try {
+          const value = localStorage.getItem(key);
+          if (value) {
+            const parsed = JSON.parse(value);
+            if (parsed && parsed.appointments && Array.isArray(parsed.appointments)) {
+              parsed.appointments.forEach((apt: {
+                barberId: string;
+                date: string;
+                time: string;
+              }) => {
+                if (apt.barberId && apt.date && apt.time) {
+                  bookings.push({
+                    barberId: apt.barberId,
+                    date: apt.date,
+                    time: apt.time,
+                  });
+                }
+              });
+            }
+          }
+        } catch {
+          continue;
+        }
+      }
+    }
+
+    setExistingBookings(bookings);
+  };
+
   useEffect(() => {
     const nextServices = loadServices();
     setServices(nextServices);
 
     const loadedCollaborators = loadCollaborators();
     setCollaborators(loadedCollaborators);
+
+    loadExistingBookings();
 
     const handleStorage = (event: StorageEvent) => {
       if (event.key === "barberbook_admin_services") {
@@ -93,12 +139,24 @@ const Booking = () => {
       if (event.key === "barberbook_admin_collaborators") {
         setCollaborators(loadCollaborators());
       }
+      if (event.key?.startsWith("bookingConfirmation")) {
+        loadExistingBookings();
+      }
     };
 
     window.addEventListener("storage", handleStorage);
 
+    const originalSetItem = localStorage.setItem;
+    localStorage.setItem = function(...args) {
+      originalSetItem.apply(this, args);
+      if (args[0]?.startsWith("bookingConfirmation")) {
+        loadExistingBookings();
+      }
+    };
+
     return () => {
       window.removeEventListener("storage", handleStorage);
+      localStorage.setItem = originalSetItem;
     };
   }, []);
 
@@ -425,7 +483,34 @@ const Booking = () => {
     const scheduleEntry = barber.schedule.find((entry) =>
       isSameDay(parseISO(entry.date), date)
     );
-    return scheduleEntry?.slots ?? [];
+    const allSlots = scheduleEntry?.slots ?? [];
+    
+    // Filtrar horários já agendados para este barbeiro nesta data
+    const bookedTimes = new Set<string>();
+    
+    // Verificar agendamentos existentes no localStorage
+    existingBookings.forEach((booking) => {
+      if (booking.barberId === barberId) {
+        try {
+          const bookingDate = parseISO(booking.date);
+          if (isSameDay(bookingDate, date)) {
+            bookedTimes.add(booking.time);
+          }
+        } catch {
+          // Ignorar datas inválidas
+        }
+      }
+    });
+    
+    // Verificar também os agendamentos que estão sendo criados agora (mas não o atual)
+    appointments.forEach((apt) => {
+      if (apt.barberId === barberId && isSameDay(apt.date, date)) {
+        bookedTimes.add(apt.time);
+      }
+    });
+    
+    // Retornar apenas os horários disponíveis que não estão agendados
+    return allSlots.filter((time) => !bookedTimes.has(time));
   };
 
   const getAllAvailableDates = useMemo(() => {
@@ -488,7 +573,7 @@ const Booking = () => {
   };
 
   useEffect(() => {
-    if (step === 3) {
+    if (step === 2) {
       if (tempBarberId) {
         const times = getAvailableTimesForBarber(tempBarberId, currentDate);
         setAvailableTimes(times);
@@ -503,12 +588,51 @@ const Booking = () => {
     }
   }, [step, currentDate, selectedBarbers, tempBarberId]);
 
+  // Auto-selecionar barbeiro quando apenas um estiver selecionado
+  useEffect(() => {
+    if (step !== 2) return;
+    
+    const unassigned = getUnassignedServices();
+    if (unassigned.length === 0) return;
+    
+    // Se houver exatamente 1 barbeiro selecionado e nenhum barbeiro temporário selecionado
+    if (selectedBarbers.length === 1 && !tempBarberId) {
+      const singleBarberId = selectedBarbers[0];
+      setTempBarberId(singleBarberId);
+      
+      // Definir a primeira data disponível para esse barbeiro
+      const dates = getAvailableDatesForBarber(singleBarberId);
+      if (dates.length > 0) {
+        setCurrentDate(dates[0]);
+      }
+    }
+    
+    // Não limpar tempBarberId quando há mais de um barbeiro - deixar o usuário escolher
+    // A limpeza só acontece se o barbeiro selecionado não estiver mais na lista de selecionados
+    if (tempBarberId && !selectedBarbers.includes(tempBarberId)) {
+      const hasAppointmentsForThisBarber = appointments.some(apt => apt.barberId === tempBarberId);
+      if (!hasAppointmentsForThisBarber) {
+        setTempBarberId("");
+        setTempTime("");
+      }
+    }
+    
+    // Se não houver barbeiros selecionados, limpar a seleção temporária
+    if (selectedBarbers.length === 0 && tempBarberId) {
+      const hasAppointmentsForThisBarber = appointments.some(apt => apt.barberId === tempBarberId);
+      if (!hasAppointmentsForThisBarber) {
+        setTempBarberId("");
+        setTempTime("");
+      }
+    }
+  }, [step, selectedBarbers, tempBarberId, appointments]);
+
   const handleBack = () => {
     if (step === 1) {
       navigate("/services");
       return;
     }
-    if (step === 3) {
+    if (step === 2) {
       setTempBarberId("");
       setTempTime("");
     }
@@ -527,21 +651,21 @@ const Booking = () => {
               Agendar <span className="text-primary">Horário</span>
             </h1>
             <p className="text-xl text-muted-foreground">
-              Processo simples em 3 passos
+              Processo simples em 2 passos
             </p>
           </div>
 
           {/* Progress Steps */}
           <div className="flex justify-center mb-12">
             <div className="flex items-center space-x-4">
-              {[1, 2, 3].map((num) => (
+              {[1, 2].map((num) => (
                 <div key={num} className="flex items-center">
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all ${
                     step >= num ? "bg-primary text-primary-foreground shadow-gold" : "bg-secondary text-muted-foreground"
                   }`}>
                     {step > num ? <Check className="h-5 w-5" /> : num}
                   </div>
-                  {num < 3 && <div className={`w-16 h-1 ${step > num ? "bg-primary" : "bg-secondary"}`} />}
+                  {num < 2 && <div className={`w-16 h-1 ${step > num ? "bg-primary" : "bg-secondary"}`} />}
                 </div>
               ))}
             </div>
@@ -552,8 +676,7 @@ const Booking = () => {
             <CardHeader>
               <CardTitle className="text-2xl">
                 {step === 1 && "Escolha o Serviço"}
-                {step === 2 && "Selecione o Barbeiro"}
-                {step === 3 && "Escolha Data e Horário"}
+                {step === 2 && "Selecione o Barbeiro, Data e Horário"}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -702,20 +825,22 @@ const Booking = () => {
                 </div>
               )}
 
-              {/* Step 2: Barber Selection */}
+              {/* Step 2: Barber Selection with Date & Time */}
               {step === 2 && (
-                <div className="space-y-4">
+                <div className="space-y-6">
                   <div className="text-center p-4 bg-primary/5 rounded-lg border border-primary/20">
                     <p className="text-sm text-muted-foreground mb-1">
                       Você selecionou <span className="font-semibold text-primary">{selectedServices.length}</span> {selectedServices.length === 1 ? "serviço" : "serviços"}
                     </p>
                     <p className="text-sm font-medium">
-                      Selecione até <span className="text-primary font-semibold">{selectedServices.length}</span> {selectedServices.length === 1 ? "barbeiro" : "barbeiros"}
+                      Selecione até <span className="text-primary font-semibold">{selectedServices.length}</span> {selectedServices.length === 1 ? "barbeiro" : "barbeiros"} e agende data e horário
                       {selectedBarbers.length > 0 && (
                         <span className="text-muted-foreground"> ({selectedBarbers.length} {selectedBarbers.length === 1 ? "selecionado" : "selecionados"})</span>
                       )}
                     </p>
                   </div>
+
+                  {/* Barber Selection */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {barbers.map((barber) => {
                       const isSelected = selectedBarbers.includes(barber.id);
@@ -728,6 +853,7 @@ const Booking = () => {
                           onClick={() => {
                             if (isSelected) {
                               setSelectedBarbers(selectedBarbers.filter(id => id !== barber.id));
+                              setAppointments(appointments.filter(apt => apt.barberId !== barber.id));
                             } else if (canSelect) {
                               setSelectedBarbers([...selectedBarbers, barber.id]);
                             }
@@ -770,11 +896,267 @@ const Booking = () => {
                       );
                     })}
                   </div>
+
+                  {/* Date & Time Selection for Selected Barbers */}
+                  {selectedBarbers.length > 0 && (
+                    <div className="space-y-4">
+                      {appointments.length > 0 && (
+                        <div className="p-4 bg-secondary/50 rounded-lg border border-border">
+                          <h4 className="font-semibold mb-3 text-sm">Agendamentos Criados:</h4>
+                          <div className="space-y-2">
+                            {appointments.map((appointment) => {
+                              const service = services.find((s) => s.id === appointment.serviceId);
+                              const barber = barbers.find((b) => b.id === appointment.barberId);
+                              const dateStr = appointment.date.toLocaleDateString("pt-BR");
+                              
+                              return (
+                                <div key={appointment.id} className="flex items-center justify-between p-3 bg-background rounded border border-border">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-sm">{service?.title}</span>
+                                      <span className="text-xs text-muted-foreground">•</span>
+                                      <span className="text-sm text-muted-foreground">{barber?.name}</span>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      {dateStr} às {appointment.time}
+                                    </p>
+                                  </div>
+                                  <Check className="h-5 w-5 text-yellow-500 flex-shrink-0" />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {getUnassignedServices().length > 0 && (
+                        <div className="space-y-4">
+                          <div className="text-center p-4 bg-primary/5 rounded-lg border border-primary/20">
+                            <p className="text-sm font-medium">
+                              Faltam <span className="font-semibold text-primary">{getUnassignedServices().length}</span> {getUnassignedServices().length === 1 ? "agendamento" : "agendamentos"}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Selecione barbeiro, data e horário para cada serviço
+                            </p>
+                          </div>
+
+                          {(() => {
+                            const unassigned = getUnassignedServices();
+                            const currentServiceId = unassigned[0];
+                            const currentService = services.find((s) => s.id === currentServiceId);
+
+                            if (!currentService) return null;
+
+                            const availableBarbersForService = selectedBarbers.length > 0 
+                              ? selectedBarbers 
+                              : barbers.map((b) => b.id);
+
+                            const selectedBarberDates = tempBarberId 
+                              ? getAvailableDatesForBarber(tempBarberId)
+                              : getAllAvailableDates;
+
+                            const selectedBarberTimes = tempBarberId && currentDate
+                              ? getAvailableTimesForBarber(tempBarberId, currentDate)
+                              : availableTimes;
+
+                            return (
+                              <div className="space-y-4 p-4 border border-border rounded-lg">
+                                <div className="text-center p-6 rounded-lg bg-primary/10 border border-primary/20 shadow-gold mb-4">
+                                  <p className="text-xs text-muted-foreground mb-2 uppercase tracking-wide font-medium">
+                                    Agendando
+                                  </p>
+                                  <h3 className="text-2xl md:text-3xl font-display font-bold text-primary">
+                                    {currentService.title}
+                                  </h3>
+                                </div>
+
+                                {/* Só mostrar seleção de barbeiro se houver mais de um barbeiro selecionado */}
+                                {selectedBarbers.length > 1 && (
+                                  <div>
+                                    <label className="text-sm font-medium mb-2 block">Selecione o Barbeiro:</label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      {barbers
+                                        .filter((b) => availableBarbersForService.includes(b.id))
+                                        .map((barber) => (
+                                          <button
+                                            key={barber.id}
+                                            onClick={() => {
+                                              setTempBarberId(barber.id);
+                                              setTempTime("");
+                                              const dates = getAvailableDatesForBarber(barber.id);
+                                              if (dates.length > 0) {
+                                                setCurrentDate(dates[0]);
+                                              }
+                                            }}
+                                            className={`p-3 rounded-lg border-2 text-left transition-all ${
+                                              tempBarberId === barber.id
+                                                ? "border-primary bg-primary/5"
+                                                : "border-border hover:border-primary/50"
+                                            }`}
+                                          >
+                                            <div className="font-semibold text-sm">{barber.name}</div>
+                                          </button>
+                                        ))}
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {/* Mostrar qual barbeiro está selecionado quando há apenas um */}
+                                {selectedBarbers.length === 1 && tempBarberId && (
+                                  <div>
+                                    <label className="text-sm font-medium mb-2 block">Barbeiro Selecionado:</label>
+                                    <div className="p-3 rounded-lg border-2 border-primary bg-primary/5">
+                                      <div className="font-semibold text-sm">
+                                        {barbers.find(b => b.id === tempBarberId)?.name || tempBarberId}
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {tempBarberId && (
+                                  <div className="space-y-4">
+                                    <div>
+                                      <label className="text-sm font-medium mb-2 block">Selecione a Data:</label>
+                                      <div className="flex justify-center w-full">
+                                        <Calendar
+                                          mode="single"
+                                          selected={currentDate}
+                                          onSelect={(date) => {
+                                            if (date) {
+                                              setCurrentDate(date);
+                                              setTempTime("");
+                                            }
+                                          }}
+                                          disabled={(date) => {
+                                            const dates = getAvailableDatesForBarber(tempBarberId);
+                                            return !dates.some((d) => isSameDay(d, date));
+                                          }}
+                                          className="rounded-md border w-full max-w-lg"
+                                        />
+                                      </div>
+                                    </div>
+
+                                    {currentDate && (
+                                      <div>
+                                        <label className="text-sm font-medium mb-2 block">Selecione o Horário:</label>
+                                        <div className="grid grid-cols-4 gap-2">
+                                          {(() => {
+                                            const times = getAvailableTimesForBarber(tempBarberId, currentDate);
+                                            return times.map((time) => {
+                                              const isSelected = tempTime === time;
+                                              const isAvailable = times.includes(time);
+                                              
+                                              const unassigned = getUnassignedServices();
+                                              const willBeSequentiallySelected = unassigned.length > 1 && 
+                                                tempTime && 
+                                                time !== tempTime &&
+                                                getTimeSlotIndex(time) > getTimeSlotIndex(tempTime) &&
+                                                getTimeSlotIndex(time) <= getTimeSlotIndex(tempTime) + getRequiredSlotsForUnassignedServices() - 1;
+
+                                              return (
+                                                <button
+                                                  key={time}
+                                                  onClick={() => {
+                                                    if (isAvailable) {
+                                                      if (isSelected) {
+                                                        setTempTime("");
+                                                      } else {
+                                                        setTempTime(time);
+                                                      }
+                                                    }
+                                                  }}
+                                                  className={`p-2 rounded-lg border text-center text-sm transition-all ${
+                                                    isSelected
+                                                      ? "border-primary bg-primary/10 text-primary font-semibold"
+                                                      : willBeSequentiallySelected
+                                                        ? "border-primary/50 bg-primary/5 text-primary font-medium"
+                                                        : !isAvailable
+                                                          ? "border-border/60 bg-secondary text-muted-foreground opacity-60 cursor-not-allowed"
+                                                          : "border-border hover:border-primary hover:bg-primary/5"
+                                                  }`}
+                                                >
+                                                  {time}
+                                                </button>
+                                              );
+                                            });
+                                          })()}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {tempTime && (
+                                      <Button
+                                        variant="hero"
+                                        className="w-full"
+                                        onClick={() => {
+                                          const unassigned = getUnassignedServices();
+                                          
+                                          if (unassigned.length > 1 && tempBarberId && currentDate) {
+                                            const availableTimes = getAvailableTimesForBarber(tempBarberId, currentDate);
+                                            const requiredSlotsForAll = getRequiredSlotsForUnassignedServices();
+                                            const sequentialSlots = findSequentialSlots(tempTime, availableTimes, requiredSlotsForAll);
+                                            
+                                            if (sequentialSlots.length === requiredSlotsForAll) {
+                                              createSequentialAppointments(tempBarberId, currentDate, tempTime);
+                                            } else {
+                                              if (currentServiceId) {
+                                                addAppointment(currentServiceId, tempBarberId, currentDate, tempTime);
+                                              }
+                                            }
+                                          } else {
+                                            if (tempBarberId && currentDate && tempTime && currentServiceId) {
+                                              addAppointment(currentServiceId, tempBarberId, currentDate, tempTime);
+                                            }
+                                          }
+                                          
+                                          setTempBarberId("");
+                                          setTempTime("");
+                                          const nextUnassigned = getUnassignedServices();
+                                          if (nextUnassigned.length > 0) {
+                                            const dates = getAllAvailableDates;
+                                            if (dates.length > 0) {
+                                              setCurrentDate(dates[0]);
+                                            }
+                                          }
+                                        }}
+                                      >
+                                        {(() => {
+                                          const unassigned = getUnassignedServices();
+                                          if (unassigned.length > 1 && tempTime && tempBarberId && currentDate) {
+                                            const availableTimes = getAvailableTimesForBarber(tempBarberId, currentDate);
+                                            const requiredSlotsForAll = getRequiredSlotsForUnassignedServices();
+                                            const sequentialSlots = findSequentialSlots(tempTime, availableTimes, requiredSlotsForAll);
+                                            
+                                            if (sequentialSlots.length === requiredSlotsForAll) {
+                                              return `Agendar ${unassigned.length} Serviços Sequencialmente`;
+                                            }
+                                          }
+                                          return "Confirmar Agendamento";
+                                        })()}
+                                      </Button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
+
+                      {getUnassignedServices().length === 0 && appointments.length > 0 && (
+                        <div className="text-center p-4 bg-primary/5 rounded-lg border border-primary/20">
+                          <p className="text-sm font-medium text-primary">
+                            Todos os agendamentos foram criados!
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* Step 3: Date & Time Selection */}
-              {step === 3 && (
+              {/* Step 3 removed - integrated into Step 2 */}
+              {false && step === 3 && (
                 <div className="space-y-6">
                   {appointments.length > 0 && (
                     <div className="p-4 bg-secondary/50 rounded-lg border border-border">
@@ -797,12 +1179,7 @@ const Booking = () => {
                                   {dateStr} às {appointment.time}
                                 </p>
                               </div>
-                              <button
-                                onClick={() => removeAppointment(appointment.id)}
-                                className="text-destructive hover:text-destructive/80 p-1"
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
+                              <Check className="h-5 w-5 text-yellow-500 flex-shrink-0" />
                             </div>
                           );
                         })}
@@ -1100,31 +1477,20 @@ const Booking = () => {
                 >
                   Voltar
                 </Button>
-                {step < 3 ? (
+                {step === 1 ? (
                   <Button
                     variant="hero"
                     onClick={() => {
-                      if (step === 2 && selectedBarbers.length > 0) {
-                        setSelectedBarber(selectedBarbers[0]);
-                      }
-                      if (step === 2) {
-                        setTempBarberId("");
-                        setTempTime("");
-                        setAppointments([]);
-                      }
                       setStep(step + 1);
                     }}
-                    disabled={
-                      (step === 1 && selectedServices.length === 0) ||
-                      (step === 2 && selectedBarbers.length === 0)
-                    }
+                    disabled={selectedServices.length === 0}
                   >
                     Próximo
                   </Button>
                 ) : (
                   <Button 
                     variant="hero" 
-                    disabled={appointments.length !== selectedServices.length}
+                    disabled={appointments.length !== selectedServices.length || selectedBarbers.length === 0}
                     onClick={() => {
                       if (appointments.length === selectedServices.length) {
                         const appointmentsToSave = appointments.map((apt) => ({

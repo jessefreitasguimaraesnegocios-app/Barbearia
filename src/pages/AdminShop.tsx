@@ -10,11 +10,11 @@ import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DEFAULT_INVENTORY, InventoryData, StoreProduct } from "@/data/inventory";
-import { loadInventory, persistInventory, resetInventory } from "@/lib/inventory-storage";
+import { loadInventory, persistInventory } from "@/lib/inventory-storage";
 import { loadBarbershops } from "@/lib/barbershops-storage";
 import { setDefaultBarbershopSelection } from "@/lib/barbershop-selection";
 import { useToast } from "@/components/ui/use-toast";
-import { ArrowLeft, ImageIcon, RefreshCcw, ShoppingCart, ShoppingBag, Star, Trash2, Plus, Sparkles, Package } from "lucide-react";
+import { ArrowLeft, ImageIcon, ShoppingCart, ShoppingBag, Star, Trash2, Plus, Sparkles, Package } from "lucide-react";
 
 interface ProductFormState {
   name: string;
@@ -24,7 +24,7 @@ interface ProductFormState {
   rating: string;
   price: string;
   vipPromotionLabel: string;
-  category: "produtos" | "consumo" | "bebidas" | "";
+  category: "produtos" | "consumo" | "bebidas" | "rascunho" | "";
 }
 
 const PLACEHOLDER_IMAGE = "/placeholder.svg";
@@ -281,7 +281,7 @@ const AdminShop = () => {
       return;
     }
 
-    if (!productForm.category) {
+    if (!productForm.category || productForm.category === "") {
       toast({
         variant: "destructive",
         title: "Categoria obrigatória",
@@ -317,11 +317,15 @@ const AdminShop = () => {
       rating: Number.isNaN(numericRating) ? baseProduct.rating : Math.min(Math.max(numericRating, 0), 5),
       price: Number.isNaN(numericPrice) ? baseProduct.price : Number(numericPrice.toFixed(2)),
       vipPromotionLabel: productForm.vipPromotionLabel.trim(),
-      category: productForm.category as "produtos" | "consumo" | "bebidas",
+      category: productForm.category as "produtos" | "consumo" | "bebidas" | "rascunho",
     };
 
     setInventory((previous) => {
       const exists = previous.storeProducts.some((product) => product.id === sanitizedProduct.id);
+      const previousProduct = exists ? previous.storeProducts.find((product) => product.id === sanitizedProduct.id) : null;
+      const wasInStore = previousProduct && previousProduct.category && previousProduct.category !== "rascunho";
+      const isNowRascunho = sanitizedProduct.category === "rascunho";
+      
       const storeProducts = exists
         ? previous.storeProducts.map((product) => (product.id === sanitizedProduct.id ? sanitizedProduct : product))
         : [...previous.storeProducts, sanitizedProduct];
@@ -336,10 +340,20 @@ const AdminShop = () => {
       };
     });
 
-    toast({
-      title: "Produto salvo",
-      description: `${sanitizedProduct.name} foi ${activeProduct ? "atualizado" : "adicionado"} à vitrine.`,
-    });
+    if (sanitizedProduct.category === "rascunho") {
+      const wasInStore = activeProduct && activeProduct.category && activeProduct.category !== "rascunho";
+      toast({
+        title: "Produto salvo",
+        description: wasInStore 
+          ? `${sanitizedProduct.name} foi removido da loja. Altere a categoria para publicar novamente.`
+          : `${sanitizedProduct.name} foi salvo como rascunho. Selecione uma categoria para publicar na loja.`,
+      });
+    } else {
+      toast({
+        title: "Produto salvo",
+        description: `${sanitizedProduct.name} foi ${activeProduct ? "atualizado" : "adicionado"} à vitrine.`,
+      });
+    }
   };
 
   const removeProduct = (id: string) => {
@@ -371,22 +385,11 @@ const AdminShop = () => {
     });
   };
 
-  const handleResetShop = () => {
-    const storedActiveId = localStorage.getItem("admin_active_barbershop_id");
-    const barbershopId = storedActiveId || activeBarbershopId;
-    resetInventory(barbershopId);
-    const data = loadInventory(barbershopId);
-    setInventory(data);
-    setStorefrontForm(data.storefront);
-    setActiveProductId(data.storeProducts[0]?.id ?? null);
-    toast({
-      title: "Loja restaurada",
-      description: "Os dados padrão da loja foram carregados novamente.",
-    });
-  };
 
   const previewProducts = useMemo(() => {
-    return inventory.storeProducts.filter((product) => product.category === previewCategory);
+    return inventory.storeProducts.filter(
+      (product) => product.category === previewCategory && product.category !== "rascunho"
+    );
   }, [inventory.storeProducts, previewCategory]);
 
   return (
@@ -408,30 +411,6 @@ const AdminShop = () => {
                   Visualize a vitrine e personalize textos, imagens e preços dos produtos.
                 </p>
               </div>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="outline">
-                    <RefreshCcw className="mr-2 h-4 w-4" />
-                    Restaurar padrão
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Restaurar vitrine?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Essa ação sobrescreve produtos, textos e imagens com as configurações iniciais.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleResetShop}>
-                      Confirmar
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
             </div>
           </div>
 
@@ -642,6 +621,11 @@ const AdminShop = () => {
                       <Package className="h-3 w-3 text-primary" />
                       {product.quantity} un.
                     </span>
+                    {product.category === "rascunho" && (
+                      <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                        Rascunho
+                      </Badge>
+                    )}
                     {product.vipDiscount > 0 && (
                       <Badge variant="outline" className="text-[10px]">
                         VIP -{product.vipDiscount}%
@@ -666,7 +650,19 @@ const AdminShop = () => {
 
     <Card className="shadow-card border-border xl:col-span-1">
       <CardHeader>
-        <CardTitle>{activeProduct ? "Editar produto" : "Selecione um produto"}</CardTitle>
+        <div className="flex items-center justify-between gap-4">
+          <CardTitle className="flex-1">{activeProduct ? "Editar produto" : "Selecione um produto"}</CardTitle>
+          <div className="flex gap-2 flex-shrink-0">
+            <Button variant="secondary" size="sm" onClick={addNewProduct}>
+              <Plus className="h-4 w-4" />
+              ADD Produto
+            </Button>
+            <Button variant="secondary" size="sm" onClick={addNewProduct}>
+              <Plus className="h-4 w-4" />
+              ADD Produto
+            </Button>
+          </div>
+        </div>
         {!activeProduct && (
           <p className="text-sm text-muted-foreground mt-1">
             Selecione um produto cadastrado no estoque para editar e publicar na loja.
@@ -679,13 +675,14 @@ const AdminShop = () => {
             <Label htmlFor="product-category">Categoria *</Label>
             <Select
               value={productForm.category}
-              onValueChange={(value) => handleProductFormChange("category", value as "produtos" | "consumo" | "bebidas" | "")}
+              onValueChange={(value) => handleProductFormChange("category", value as "produtos" | "consumo" | "bebidas" | "rascunho" | "")}
               required
             >
               <SelectTrigger id="product-category">
                 <SelectValue placeholder="Selecione uma categoria" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="rascunho">Selecione uma Categoria</SelectItem>
                 <SelectItem value="produtos">Produtos</SelectItem>
                 <SelectItem value="consumo">Consumo</SelectItem>
                 <SelectItem value="bebidas">Bebidas</SelectItem>

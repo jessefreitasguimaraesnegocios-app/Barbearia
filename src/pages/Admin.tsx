@@ -14,8 +14,13 @@ import {
   ShoppingBag,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useState, type MouseEvent } from "react";
+import { useState, useEffect, useMemo, type MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import { loadServices } from "@/lib/services-storage";
+import { loadCollaborators } from "@/lib/collaborators-storage";
+import { DEFAULT_SERVICES, ServiceItem } from "@/data/services";
+import { Collaborator } from "@/data/collaborators";
+import { parseISO, isSameDay, startOfToday } from "date-fns";
 
 type StatItem = {
   key: string;
@@ -49,6 +54,25 @@ const clientViews = [
   { title: "Cliente vip inativo", value: "12" },
 ];
 
+interface AppointmentData {
+  id: string;
+  serviceId: string;
+  barberId: string;
+  date: string;
+  time: string;
+  clientName?: string;
+}
+
+interface BookingConfirmation {
+  appointments: AppointmentData[];
+  payment: {
+    fullName: string;
+    phone: string;
+    cpf: string;
+  };
+  timestamp: string;
+}
+
 const Admin = () => {
   const navigate = useNavigate();
   const [revenueViewIndex, setRevenueViewIndex] = useState(0);
@@ -56,6 +80,9 @@ const Admin = () => {
   const [bookingViewIndex, setBookingViewIndex] = useState(0);
   const [inventoryViewIndex, setInventoryViewIndex] = useState(0);
   const [clientViewIndex, setClientViewIndex] = useState(0);
+  const [allBookings, setAllBookings] = useState<BookingConfirmation[]>([]);
+  const [services, setServices] = useState<ServiceItem[]>(DEFAULT_SERVICES);
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
 
   const baseStats: StatItem[] = [
     { key: "bookings", title: "Agendamentos Hoje", value: "23", icon: Calendar, color: "text-primary" },
@@ -84,6 +111,117 @@ const Admin = () => {
   const handleClientCardClick = () => {
     setClientViewIndex((prev) => (prev + 1) % clientViews.length);
   };
+
+  const loadBookings = () => {
+    const updatedBookings: BookingConfirmation[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith("bookingConfirmation")) {
+        try {
+          const value = localStorage.getItem(key);
+          if (value) {
+            const parsed = JSON.parse(value);
+            if (parsed && parsed.appointments) {
+              if (Array.isArray(parsed)) {
+                updatedBookings.push(...parsed.filter((b: BookingConfirmation) => b && b.appointments));
+              } else {
+                updatedBookings.push(parsed);
+              }
+            }
+          }
+        } catch {
+          continue;
+        }
+      }
+    }
+    setAllBookings(updatedBookings);
+  };
+
+  useEffect(() => {
+    const nextServices = loadServices();
+    setServices(nextServices);
+    
+    const loadedCollaborators = loadCollaborators();
+    setCollaborators(loadedCollaborators);
+    
+    loadBookings();
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key?.startsWith("bookingConfirmation")) {
+        loadBookings();
+      }
+    };
+
+    window.addEventListener("storage", handleStorage);
+
+    const originalSetItem = localStorage.setItem;
+    localStorage.setItem = function(...args) {
+      originalSetItem.apply(this, args);
+      if (args[0]?.startsWith("bookingConfirmation")) {
+        loadBookings();
+      }
+    };
+
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      localStorage.setItem = originalSetItem;
+    };
+  }, []);
+
+  const getBarberIdFromCollaborator = (collaborator: Collaborator): string => {
+    const nameSlug = collaborator.name.toLowerCase().replace(/\s+/g, "-");
+    return nameSlug;
+  };
+
+  const getBarberName = (barberId: string): string => {
+    const collaborator = collaborators.find((c) => c.id === barberId);
+    if (collaborator) {
+      return collaborator.name;
+    }
+    const barberIdSlug = getBarberIdFromCollaborator({ id: barberId, name: barberId } as Collaborator);
+    const collaboratorBySlug = collaborators.find((c) => {
+      const slug = getBarberIdFromCollaborator(c);
+      return slug === barberId || slug === barberIdSlug;
+    });
+    return collaboratorBySlug?.name || barberId;
+  };
+
+  const todayAppointments = useMemo(() => {
+    const today = startOfToday();
+    const appointments: Array<{
+      client: string;
+      service: string;
+      time: string;
+      barber: string;
+      date: Date;
+    }> = [];
+
+    allBookings.forEach((booking) => {
+      booking.appointments.forEach((apt) => {
+        const aptDate = parseISO(apt.date);
+        if (isSameDay(aptDate, today)) {
+          const service = services.find((s) => s.id === apt.serviceId);
+          const barberName = getBarberName(apt.barberId);
+          appointments.push({
+            client: apt.clientName || booking.payment.fullName,
+            service: service?.title || "Serviço",
+            time: apt.time,
+            barber: barberName,
+            date: aptDate,
+          });
+        }
+      });
+    });
+
+    appointments.sort((a, b) => {
+      if (a.time.localeCompare(b.time) !== 0) {
+        return a.time.localeCompare(b.time);
+      }
+      return a.date.getTime() - b.date.getTime();
+    });
+
+    return appointments.slice(0, 4);
+  }, [allBookings, services, collaborators]);
 
   const stats = baseStats.map((stat) => {
     if (stat.key === "revenue") {
@@ -134,11 +272,6 @@ const Admin = () => {
     return stat;
   });
 
-  const recentBookings = [
-    { client: "João Silva", service: "Corte + Barba", time: "10:00", barber: "Miguel Santos" },
-    { client: "Pedro Souza", service: "Corte Clássico", time: "11:30", barber: "Rafael Costa" },
-    { client: "Carlos Lima", service: "Barba Completa", time: "14:00", barber: "André Silva" },
-  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -196,21 +329,27 @@ const Admin = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {recentBookings.map((booking, index) => (
-                    <div key={index} className="flex items-center justify-between p-4 bg-secondary rounded-lg">
-                      <div>
-                        <div className="font-semibold">{booking.client}</div>
-                        <div className="text-sm text-muted-foreground">{booking.service}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="flex items-center text-primary font-semibold">
-                          <Clock className="h-4 w-4 mr-1" />
-                          {booking.time}
+                  {todayAppointments.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-4">
+                      Nenhum agendamento para hoje
+                    </p>
+                  ) : (
+                    todayAppointments.map((booking, index) => (
+                      <div key={index} className="flex items-center justify-between p-4 bg-secondary rounded-lg">
+                        <div>
+                          <div className="font-semibold">{booking.client}</div>
+                          <div className="text-sm text-muted-foreground">{booking.service}</div>
                         </div>
-                        <div className="text-sm text-muted-foreground">{booking.barber}</div>
+                        <div className="text-right">
+                          <div className="flex items-center text-primary font-semibold">
+                            <Clock className="h-4 w-4 mr-1" />
+                            {booking.time}
+                          </div>
+                          <div className="text-sm text-muted-foreground">{booking.barber}</div>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </CardContent>
             </Card>

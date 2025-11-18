@@ -25,7 +25,8 @@ const isValidCollaborator = (entry: unknown): entry is Collaborator => {
     typeof typed.specialty === "string" &&
     typeof typed.createdAt === "string" &&
     (typed.photoUrl === undefined || typeof typed.photoUrl === "string") &&
-    (typed.experience === undefined || typeof typed.experience === "string")
+    (typed.experience === undefined || typeof typed.experience === "string") &&
+    (typed.workSchedule === undefined || typeof typed.workSchedule === "string")
   );
 };
 
@@ -36,6 +37,7 @@ const sanitizeCollaborator = (entry: Collaborator): Collaborator => ({
   paymentMethod: entry.paymentMethod,
   photoUrl: entry.photoUrl,
   experience: entry.experience,
+  workSchedule: entry.workSchedule,
 });
 
 export const loadCollaborators = (): Collaborator[] => {

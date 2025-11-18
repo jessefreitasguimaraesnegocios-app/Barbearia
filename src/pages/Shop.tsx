@@ -23,8 +23,11 @@ const generateNumericId = (id: string): number => {
     hash = hash & hash;
   }
   const numericId = Math.abs(hash);
-  if (numericId === 0 || numericId > Number.MAX_SAFE_INTEGER) {
-    return Math.abs(hash % Number.MAX_SAFE_INTEGER) || 1;
+  if (numericId === 0) {
+    return Math.abs(hash % 2147483647) || 1;
+  }
+  if (numericId > 2147483647) {
+    return numericId % 2147483647;
   }
   return numericId;
 };
@@ -144,7 +147,9 @@ const Shop = () => {
 
   const displayProducts = useMemo(() => {
     const allProducts = !products.length ? DEFAULT_INVENTORY.storeProducts : products;
-    return allProducts.filter((product) => product.category === selectedCategory);
+    return allProducts.filter(
+      (product) => product.category === selectedCategory && product.category && product.category !== "rascunho"
+    );
   }, [products, selectedCategory]);
 
   const handleAddToCart = (product: (typeof displayProducts)[number]) => {

@@ -129,7 +129,8 @@ const ConfirmBooking = () => {
         timestamp: new Date().toISOString(),
       };
       
-      localStorage.setItem("bookingConfirmation", JSON.stringify(bookingData));
+      const bookingKey = `bookingConfirmation_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+      localStorage.setItem(bookingKey, JSON.stringify(bookingData));
       
       alert("Agendamento confirmado com sucesso!");
       localStorage.removeItem("bookingAppointments");

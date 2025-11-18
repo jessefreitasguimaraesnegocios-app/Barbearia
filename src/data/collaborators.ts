@@ -15,6 +15,7 @@ export interface Collaborator {
   paymentMethod?: PaymentMethod;
   photoUrl?: string;
   experience?: string;
+  workSchedule?: string;
   createdAt: string;
 }
 

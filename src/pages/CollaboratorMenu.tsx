@@ -87,6 +87,7 @@ const CollaboratorMenu = () => {
 		specialty: "",
 		photoUrl: "",
 		experience: "",
+		workSchedule: "",
 	});
 	const [allBookings, setAllBookings] = useState<BookingConfirmation[]>([]);
 	const [services, setServices] = useState<ServiceItem[]>([]);
@@ -114,6 +115,7 @@ const CollaboratorMenu = () => {
 					specialty: found.specialty,
 					photoUrl: found.photoUrl || "",
 					experience: found.experience || "",
+					workSchedule: found.workSchedule || "",
 				});
 			}
 		}
@@ -262,7 +264,75 @@ const CollaboratorMenu = () => {
 		localStorage.setItem(storageKey, JSON.stringify(next));
 	};
 
+	const hasRecordedToday = (type: TimeClockRecord["type"]): boolean => {
+		return records.some((record) => record.type === type);
+	};
+
+	const parseWorkSchedule = (schedule: string): { start: number; end: number } | null => {
+		if (!schedule) return null;
+		const match = schedule.match(/(\d+)\s*hs?\s*(?:as|às|a)\s*(\d+)\s*hs?/i);
+		if (match) {
+			return {
+				start: parseInt(match[1], 10),
+				end: parseInt(match[2], 10),
+			};
+		}
+		return null;
+	};
+
+	const calculateWorkHours = () => {
+		if (records.length < 4) return null;
+
+		const entrada = records.find((r) => r.type === "entrada");
+		const almocoInicio = records.find((r) => r.type === "almoco-inicio");
+		const almocoFim = records.find((r) => r.type === "almoco-fim");
+		const saida = records.find((r) => r.type === "saida");
+
+		if (!entrada || !almocoInicio || !almocoFim || !saida) return null;
+
+		const entradaTime = new Date(entrada.timestamp).getTime();
+		const almocoInicioTime = new Date(almocoInicio.timestamp).getTime();
+		const almocoFimTime = new Date(almocoFim.timestamp).getTime();
+		const saidaTime = new Date(saida.timestamp).getTime();
+
+		const manha = (almocoInicioTime - entradaTime) / (1000 * 60 * 60);
+		const almoco = (almocoFimTime - almocoInicioTime) / (1000 * 60 * 60);
+		const tarde = (saidaTime - almocoFimTime) / (1000 * 60 * 60);
+
+		const totalHours = manha + tarde;
+		const totalMinutes = Math.round((totalHours % 1) * 60);
+		const totalHoursInt = Math.floor(totalHours);
+
+		return {
+			totalHours: totalHours,
+			formatted: `${totalHoursInt}h ${totalMinutes}min`,
+			manha,
+			almoco,
+			tarde,
+		};
+	};
+
+	const calculateOvertime = (totalHours: number): string | null => {
+		if (!collaborator?.workSchedule) return null;
+
+		const schedule = parseWorkSchedule(collaborator.workSchedule);
+		if (!schedule) return null;
+
+		const expectedHours = schedule.end - schedule.start;
+		const overtime = totalHours - expectedHours;
+
+		if (overtime <= 0) return null;
+
+		const overtimeHours = Math.floor(overtime);
+		const overtimeMinutes = Math.round((overtime % 1) * 60);
+
+		return `${overtimeHours}h ${overtimeMinutes}min`;
+	};
+
 	const requestRecord = (type: TimeClockRecord["type"]) => {
+		if (hasRecordedToday(type)) {
+			return;
+		}
 		setPendingType(type);
 		setConfirmOpen(true);
 	};
@@ -362,6 +432,7 @@ const CollaboratorMenu = () => {
 					specialty: formData.specialty.trim(),
 					photoUrl: formData.photoUrl.trim() || undefined,
 					experience: formData.experience.trim() || undefined,
+					workSchedule: formData.workSchedule.trim() || undefined,
 				}
 				: c
 		);
@@ -507,6 +578,16 @@ const CollaboratorMenu = () => {
 										</div>
 
 										<div className="space-y-2">
+											<Label htmlFor="workSchedule">Horário de Trabalho</Label>
+											<Input
+												id="workSchedule"
+												value={formData.workSchedule}
+												onChange={(e) => handleFormChange("workSchedule", e.target.value)}
+												placeholder="Ex: de 8hs às 22hs"
+											/>
+										</div>
+
+										<div className="space-y-2">
 											<Label>Função</Label>
 											<Input value={collaborator?.role || "-"} disabled />
 										</div>
@@ -527,6 +608,7 @@ const CollaboratorMenu = () => {
 															specialty: collaborator.specialty,
 															photoUrl: collaborator.photoUrl || "",
 															experience: collaborator.experience || "",
+															workSchedule: collaborator.workSchedule || "",
 														});
 													}
 												}}
@@ -564,6 +646,9 @@ const CollaboratorMenu = () => {
 									{collaborator?.experience && (
 										<div><span className="text-muted-foreground">Experiência:</span> <span className="font-medium">{collaborator.experience}</span></div>
 									)}
+									{collaborator?.workSchedule && (
+										<div><span className="text-muted-foreground">Horário de Trabalho:</span> <span className="font-medium">{collaborator.workSchedule}</span></div>
+									)}
 									<div><span className="text-muted-foreground">Função:</span> <span className="font-medium">{active?.role ?? "-"}</span></div>
 									<div className="pt-2">
 										<AlertDialog>
@@ -589,13 +674,42 @@ const CollaboratorMenu = () => {
 					<Card className="shadow-card border-border">
 						<CardHeader>
 							<CardTitle>Registro de Ponto (Hoje)</CardTitle>
+							{collaborator?.workSchedule && (
+								<p className="text-sm text-muted-foreground mt-1">
+									Carga horária: {collaborator.workSchedule}
+								</p>
+							)}
 						</CardHeader>
 						<CardContent className="space-y-4">
 							<div className="flex flex-wrap gap-2">
-								<Button variant="secondary" onClick={() => requestRecord("entrada")}>Registrar Entrada</Button>
-								<Button variant="secondary" onClick={() => requestRecord("almoco-inicio")}>Início Almoço</Button>
-								<Button variant="secondary" onClick={() => requestRecord("almoco-fim")}>Fim Almoço</Button>
-								<Button variant="secondary" onClick={() => requestRecord("saida")}>Registrar Saída</Button>
+								<Button 
+									variant="secondary" 
+									onClick={() => requestRecord("entrada")}
+									disabled={hasRecordedToday("entrada")}
+								>
+									Registrar Entrada
+								</Button>
+								<Button 
+									variant="secondary" 
+									onClick={() => requestRecord("almoco-inicio")}
+									disabled={hasRecordedToday("almoco-inicio")}
+								>
+									Início Almoço
+								</Button>
+								<Button 
+									variant="secondary" 
+									onClick={() => requestRecord("almoco-fim")}
+									disabled={hasRecordedToday("almoco-fim")}
+								>
+									Fim Almoço
+								</Button>
+								<Button 
+									variant="secondary" 
+									onClick={() => requestRecord("saida")}
+									disabled={hasRecordedToday("saida")}
+								>
+									Registrar Saída
+								</Button>
 							</div>
 							<AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
 								<AlertDialogContent>
@@ -622,6 +736,27 @@ const CollaboratorMenu = () => {
 								))}
 								{records.length === 0 && <div className="text-sm text-muted-foreground">Sem registros hoje.</div>}
 							</ul>
+							{(() => {
+								const workHours = calculateWorkHours();
+								if (!workHours) return null;
+
+								const overtime = calculateOvertime(workHours.totalHours);
+
+								return (
+									<div className="mt-4 pt-4 border-t border-border space-y-2">
+										<div className="flex items-center justify-between">
+											<span className="text-sm font-medium">Total de horas trabalhadas (no dia):</span>
+											<span className="text-sm font-semibold text-primary">{workHours.formatted}</span>
+										</div>
+										{overtime && (
+											<div className="flex items-center justify-between">
+												<span className="text-sm font-medium">Horas extras:</span>
+												<span className="text-sm font-semibold text-primary">{overtime}</span>
+											</div>
+										)}
+									</div>
+								);
+							})()}
 						</CardContent>
 					</Card>
 
