@@ -15,6 +15,20 @@ const PLACEHOLDER_IMAGE = "/placeholder.svg";
 
 type CategoryFilter = "produtos" | "consumo" | "bebidas";
 
+const generateNumericId = (id: string): number => {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    const char = id.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  const numericId = Math.abs(hash);
+  if (numericId === 0 || numericId > Number.MAX_SAFE_INTEGER) {
+    return Math.abs(hash % Number.MAX_SAFE_INTEGER) || 1;
+  }
+  return numericId;
+};
+
 type StoredBarbershopSelection = {
   id: string;
   name: string;
@@ -134,14 +148,14 @@ const Shop = () => {
   }, [products, selectedCategory]);
 
   const handleAddToCart = (product: (typeof displayProducts)[number]) => {
-    const numericId = Number(product.id.toString().replace(/[^\d]/g, "")) || displayProducts.indexOf(product) + 1;
+    const numericId = generateNumericId(product.id);
 
     let productImage = product.imageUrl?.trim() || "";
     if (!productImage || productImage.length === 0) {
       productImage = PLACEHOLDER_IMAGE;
     }
 
-    addItem({
+    const wasAdded = addItem({
       id: numericId,
       name: product.name,
       priceLabel: currencyFormatter.format(product.price),
@@ -149,10 +163,18 @@ const Shop = () => {
       image: productImage,
     });
 
+    if (wasAdded) {
     toast({
       title: "Produto adicionado",
       description: `${product.name} foi adicionado ao carrinho.`,
     });
+    } else {
+      toast({
+        variant: "default",
+        title: "Produto já no carrinho",
+        description: `${product.name} já está no carrinho. Ajuste a quantidade na página do carrinho.`,
+      });
+    }
   };
 
   return (

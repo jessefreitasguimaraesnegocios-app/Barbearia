@@ -10,6 +10,8 @@ import type { Matcher } from "react-day-picker";
 import { addDays, isBefore, isSameDay, parseISO, startOfToday } from "date-fns";
 import { DEFAULT_SERVICES, ServiceItem } from "@/data/services";
 import { loadServices } from "@/lib/services-storage";
+import { loadCollaborators } from "@/lib/collaborators-storage";
+import { Collaborator } from "@/data/collaborators";
 
 interface Appointment {
   id: string;
@@ -32,6 +34,7 @@ const Booking = () => {
   const [availableTimes, setAvailableTimes] = useState<string[]>([]);
   const [tempBarberId, setTempBarberId] = useState<string>("");
   const [tempTime, setTempTime] = useState<string>("");
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const currencyFormatter = useMemo(
     () => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }),
     []
@@ -80,9 +83,15 @@ const Booking = () => {
     const nextServices = loadServices();
     setServices(nextServices);
 
+    const loadedCollaborators = loadCollaborators();
+    setCollaborators(loadedCollaborators);
+
     const handleStorage = (event: StorageEvent) => {
       if (event.key === "barberbook_admin_services") {
         setServices(loadServices());
+      }
+      if (event.key === "barberbook_admin_collaborators") {
+        setCollaborators(loadCollaborators());
       }
     };
 
@@ -267,88 +276,130 @@ const Booking = () => {
     }
   }, [selectedServices.length]);
 
-  const barbers = [
-    {
-      id: "miguel-santos",
-      name: "Miguel Santos",
-      specialty: "Cortes Clássicos",
-      experience: "8 anos",
-      schedule: [
+  const getBarberIdFromCollaborator = (collaborator: Collaborator): string => {
+    const nameSlug = collaborator.name.toLowerCase().replace(/\s+/g, "-");
+    return nameSlug;
+  };
+
+  const barbers = useMemo(() => {
+    const barberCollaborators = collaborators.filter(
+      (c) => c.role === "barbeiro" || c.role === "barbeiro-junior"
+    );
+
+    if (barberCollaborators.length === 0) {
+      return [
         {
-          date: addDays(startOfToday(), 0).toISOString(),
-          slots: ["09:00", "09:30", "10:30", "11:30", "14:00", "16:00"],
+          id: "miguel-santos",
+          name: "Miguel Santos",
+          specialty: "Cortes Clássicos",
+          experience: "8 anos",
+          photoUrl: undefined,
+          schedule: [
+            {
+              date: addDays(startOfToday(), 0).toISOString(),
+              slots: ["09:00", "09:30", "10:30", "11:30", "14:00", "16:00"],
+            },
+            {
+              date: addDays(startOfToday(), 1).toISOString(),
+              slots: ["10:00", "11:00", "15:00", "17:00"],
+            },
+            {
+              date: addDays(startOfToday(), 3).toISOString(),
+              slots: ["09:30", "13:00", "18:00"],
+            },
+          ],
         },
         {
-          date: addDays(startOfToday(), 1).toISOString(),
-          slots: ["10:00", "11:00", "15:00", "17:00"],
+          id: "rafael-costa",
+          name: "Rafael Costa",
+          specialty: "Barbas Desenhadas",
+          experience: "5 anos",
+          photoUrl: undefined,
+          schedule: [
+            {
+              date: addDays(startOfToday(), 0).toISOString(),
+              slots: ["09:00", "11:00", "14:30", "18:00"],
+            },
+            {
+              date: addDays(startOfToday(), 2).toISOString(),
+              slots: ["10:30", "11:30", "15:30", "19:00"],
+            },
+            {
+              date: addDays(startOfToday(), 4).toISOString(),
+              slots: ["09:00", "09:30", "10:00", "16:00", "18:30"],
+            },
+          ],
         },
         {
-          date: addDays(startOfToday(), 3).toISOString(),
-          slots: ["09:30", "13:00", "18:00"],
-        },
-      ],
-    },
-    {
-      id: "rafael-costa",
-      name: "Rafael Costa",
-      specialty: "Barbas Desenhadas",
-      experience: "5 anos",
-      schedule: [
-        {
-          date: addDays(startOfToday(), 0).toISOString(),
-          slots: ["09:00", "11:00", "14:30", "18:00"],
-        },
-        {
-          date: addDays(startOfToday(), 2).toISOString(),
-          slots: ["10:30", "11:30", "15:30", "19:00"],
-        },
-        {
-          date: addDays(startOfToday(), 4).toISOString(),
-          slots: ["09:00", "09:30", "10:00", "16:00", "18:30"],
-        },
-      ],
-    },
-    {
-      id: "andre-silva",
-      name: "André Silva",
-      specialty: "Cortes Modernos",
-      experience: "10 anos",
-      schedule: [
-        {
-          date: addDays(startOfToday(), 1).toISOString(),
-          slots: ["09:30", "10:00", "14:00", "17:00"],
+          id: "andre-silva",
+          name: "André Silva",
+          specialty: "Cortes Modernos",
+          experience: "10 anos",
+          photoUrl: undefined,
+          schedule: [
+            {
+              date: addDays(startOfToday(), 1).toISOString(),
+              slots: ["09:30", "10:00", "14:00", "17:00"],
+            },
+            {
+              date: addDays(startOfToday(), 2).toISOString(),
+              slots: ["09:00", "09:30", "11:00", "15:30"],
+            },
+            {
+              date: addDays(startOfToday(), 5).toISOString(),
+              slots: ["08:00", "09:30", "11:30", "17:30", "19:00"],
+            },
+          ],
         },
         {
-          date: addDays(startOfToday(), 2).toISOString(),
-          slots: ["09:00", "09:30", "11:00", "15:30"],
+          id: "lucas-oliveira",
+          name: "Lucas Oliveira",
+          specialty: "Coloração",
+          experience: "6 anos",
+          photoUrl: undefined,
+          schedule: [
+            {
+              date: addDays(startOfToday(), 0).toISOString(),
+              slots: ["09:00", "10:00", "11:00", "14:00", "15:00"],
+            },
+            {
+              date: addDays(startOfToday(), 2).toISOString(),
+              slots: ["09:30", "10:30", "13:00", "16:30"],
+            },
+            {
+              date: addDays(startOfToday(), 3).toISOString(),
+              slots: ["09:00", "11:30", "14:00", "18:30"],
+            },
+          ],
         },
-        {
-          date: addDays(startOfToday(), 5).toISOString(),
-          slots: ["08:00", "09:30", "11:30", "17:30", "19:00"],
-        },
-      ],
-    },
-    {
-      id: "lucas-oliveira",
-      name: "Lucas Oliveira",
-      specialty: "Coloração",
-      experience: "6 anos",
-      schedule: [
-        {
-          date: addDays(startOfToday(), 0).toISOString(),
-          slots: ["09:00", "10:00", "11:00", "14:00", "15:00"],
-        },
-        {
-          date: addDays(startOfToday(), 2).toISOString(),
-          slots: ["09:30", "10:30", "13:00", "16:30"],
-        },
-        {
-          date: addDays(startOfToday(), 3).toISOString(),
-          slots: ["09:00", "11:30", "14:00", "18:30"],
-        },
-      ],
-    },
-  ];
+      ];
+    }
+
+    return barberCollaborators.map((collaborator) => {
+      const barberId = getBarberIdFromCollaborator(collaborator);
+      return {
+        id: barberId,
+        name: collaborator.name,
+        specialty: collaborator.specialty || "Barbeiro",
+        experience: collaborator.experience || "Experiente",
+        photoUrl: collaborator.photoUrl,
+        schedule: [
+          {
+            date: addDays(startOfToday(), 0).toISOString(),
+            slots: ["09:00", "09:30", "10:30", "11:30", "14:00", "16:00"],
+          },
+          {
+            date: addDays(startOfToday(), 1).toISOString(),
+            slots: ["10:00", "11:00", "15:00", "17:00"],
+          },
+          {
+            date: addDays(startOfToday(), 3).toISOString(),
+            slots: ["09:30", "13:00", "18:00"],
+          },
+        ],
+      };
+    });
+  }, [collaborators]);
 
   const timeSlots = [
     "08:00", "08:30",
@@ -691,20 +742,30 @@ const Booking = () => {
                           }`}
                         >
                           <div className="flex items-start mb-3">
-                            <div className="p-2 bg-primary/10 rounded-full mr-3">
-                              <User className="h-6 w-6 text-primary" />
+                            <div className="h-12 w-12 rounded-full overflow-hidden bg-secondary border-2 border-primary mr-3 flex-shrink-0">
+                              {barber.photoUrl ? (
+                                <img
+                                  src={barber.photoUrl}
+                                  alt={barber.name}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <div className="h-full w-full flex items-center justify-center bg-primary/10">
+                                  <User className="h-6 w-6 text-primary" />
+                                </div>
+                              )}
                             </div>
-                            <div className="flex-1">
+                            <div className="flex-1 min-w-0">
                               <h3 className="font-semibold text-lg">{barber.name}</h3>
                               <p className="text-sm text-muted-foreground">{barber.specialty}</p>
+                              <p className="text-sm text-muted-foreground mt-1">Experiência: {barber.experience}</p>
                             </div>
                             {isSelected && (
-                              <div className="ml-2">
+                              <div className="ml-2 flex-shrink-0">
                                 <Check className="h-5 w-5 text-primary" />
                               </div>
                             )}
                           </div>
-                          <p className="text-sm text-muted-foreground">Experiência: {barber.experience}</p>
                         </button>
                       );
                     })}
@@ -812,8 +873,28 @@ const Booking = () => {
                                           : "border-border hover:border-primary/50"
                                       }`}
                                     >
-                                      <div className="font-medium text-sm">{barber.name}</div>
-                                      <div className="text-xs text-muted-foreground">{barber.specialty}</div>
+                                      <div className="flex items-center gap-2">
+                                        <div className="h-10 w-10 rounded-full overflow-hidden bg-secondary border border-primary flex-shrink-0">
+                                          {barber.photoUrl ? (
+                                            <img
+                                              src={barber.photoUrl}
+                                              alt={barber.name}
+                                              className="h-full w-full object-cover"
+                                            />
+                                          ) : (
+                                            <div className="h-full w-full flex items-center justify-center bg-primary/10">
+                                              <User className="h-5 w-5 text-primary" />
+                                            </div>
+                                          )}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <div className="font-medium text-sm">{barber.name}</div>
+                                          <div className="text-xs text-muted-foreground">{barber.specialty}</div>
+                                          {barber.experience && (
+                                            <div className="text-xs text-muted-foreground">{barber.experience}</div>
+                                          )}
+                                        </div>
+                                      </div>
                                     </button>
                                   ))}
                               </div>

@@ -13,6 +13,8 @@ export interface Collaborator {
   role: CollaboratorRole;
   specialty: string;
   paymentMethod?: PaymentMethod;
+  photoUrl?: string;
+  experience?: string;
   createdAt: string;
 }
 

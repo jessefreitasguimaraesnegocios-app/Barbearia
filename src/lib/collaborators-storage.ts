@@ -23,7 +23,9 @@ const isValidCollaborator = (entry: unknown): entry is Collaborator => {
     typeof typed.role === "string" &&
     ["barbeiro", "barbeiro-junior", "faxineira", "socio", "atendente"].includes(typed.role) &&
     typeof typed.specialty === "string" &&
-    typeof typed.createdAt === "string"
+    typeof typed.createdAt === "string" &&
+    (typed.photoUrl === undefined || typeof typed.photoUrl === "string") &&
+    (typed.experience === undefined || typeof typed.experience === "string")
   );
 };
 
@@ -32,6 +34,8 @@ const sanitizeCollaborator = (entry: Collaborator): Collaborator => ({
   password: entry.password || hashPassword(entry.cpf),
   specialty: entry.specialty ?? "",
   paymentMethod: entry.paymentMethod,
+  photoUrl: entry.photoUrl,
+  experience: entry.experience,
 });
 
 export const loadCollaborators = (): Collaborator[] => {

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 type CartProduct = {
   id: number;
@@ -14,7 +14,7 @@ export type CartItem = CartProduct & {
 
 type CartContextValue = {
   items: CartItem[];
-  addItem: (product: CartProduct, quantity?: number) => void;
+  addItem: (product: CartProduct, quantity?: number) => boolean;
   removeItem: (productId: number) => void;
   updateQuantity: (productId: number, quantity: number) => void;
   clearCart: () => void;
@@ -62,6 +62,12 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       return [];
     }
   });
+  
+  const itemsRef = useRef<CartItem[]>(items);
+
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -93,24 +99,25 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [items]);
 
-  const addItem = (product: CartProduct, quantity = 1) => {
+  const addItem = (product: CartProduct, quantity = 1): boolean => {
+    let wasAdded = false;
     setItems((prev) => {
-      if (prev.length >= 50) {
-        console.warn("[Cart] Cart limit reached (50 items), removing oldest item");
-        prev = prev.slice(1);
-      }
-      
       const existing = prev.find((item) => item.id === product.id);
       if (existing) {
-        return prev.map((item) =>
-          item.id === product.id
-            ? { ...item, quantity: Math.min(item.quantity + quantity, 99) }
-            : item
-        );
+        wasAdded = false;
+        return prev;
       }
       
-      return [...prev, { ...product, quantity }];
+      let itemsToUpdate = prev;
+      if (itemsToUpdate.length >= 50) {
+        console.warn("[Cart] Cart limit reached (50 items), removing oldest item");
+        itemsToUpdate = itemsToUpdate.slice(1);
+      }
+      
+      wasAdded = true;
+      return [...itemsToUpdate, { ...product, quantity }];
     });
+    return wasAdded;
   };
 
   const removeItem = (productId: number) => {

@@ -14,7 +14,7 @@ import { loadInventory, persistInventory, resetInventory } from "@/lib/inventory
 import { loadBarbershops } from "@/lib/barbershops-storage";
 import { setDefaultBarbershopSelection } from "@/lib/barbershop-selection";
 import { useToast } from "@/components/ui/use-toast";
-import { ArrowLeft, ImageIcon, RefreshCcw, ShoppingCart, ShoppingBag, Star, Trash2, Plus, Sparkles } from "lucide-react";
+import { ArrowLeft, ImageIcon, RefreshCcw, ShoppingCart, ShoppingBag, Star, Trash2, Plus, Sparkles, Package } from "lucide-react";
 
 interface ProductFormState {
   name: string;
@@ -66,7 +66,13 @@ const AdminShop = () => {
   );
 
   useEffect(() => {
+    let isInternalUpdate = false;
+    
     const loadData = () => {
+      if (isInternalUpdate) {
+        return;
+      }
+      
       const barbershops = loadBarbershops();
       const storedActiveId = localStorage.getItem("admin_active_barbershop_id");
       const storedMatch = storedActiveId ? barbershops.find((shop) => shop.id === storedActiveId) : null;
@@ -100,15 +106,44 @@ const AdminShop = () => {
     loadData();
     
     const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === "admin_active_barbershop_id") {
+      if (
+        event.key === "admin_active_barbershop_id" ||
+        event.key?.startsWith("barberbook_admin_inventory")
+      ) {
         loadData();
       }
     };
     
     window.addEventListener("storage", handleStorageChange);
     
+    const handleLocalStorageChange = () => {
+      if (!isInternalUpdate) {
+        loadData();
+      }
+    };
+    
+    const originalSetItem = localStorage.setItem;
+    localStorage.setItem = function(...args) {
+      const isInventoryKey = args[0] === "admin_active_barbershop_id" || args[0]?.startsWith("barberbook_admin_inventory");
+      
+      if (isInventoryKey && !args[0]?.includes("_default") && initializedRef.current) {
+        isInternalUpdate = true;
+        originalSetItem.apply(this, args);
+        setTimeout(() => {
+          isInternalUpdate = false;
+        }, 100);
+      } else {
+        originalSetItem.apply(this, args);
+      }
+      
+      if (isInventoryKey && !isInternalUpdate) {
+        handleLocalStorageChange();
+      }
+    };
+    
     return () => {
       window.removeEventListener("storage", handleStorageChange);
+      localStorage.setItem = originalSetItem;
     };
   }, []);
 
@@ -118,7 +153,12 @@ const AdminShop = () => {
     }
     const storedActiveId = localStorage.getItem("admin_active_barbershop_id");
     const barbershopId = storedActiveId || activeBarbershopId;
-    persistInventory(inventory, barbershopId);
+    
+    const timeoutId = setTimeout(() => {
+      persistInventory(inventory, barbershopId);
+    }, 300);
+    
+    return () => clearTimeout(timeoutId);
   }, [inventory, activeBarbershopId]);
 
   const activeProduct = useMemo(
@@ -370,10 +410,6 @@ const AdminShop = () => {
               </div>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Button variant="secondary" onClick={addNewProduct}>
-                <Plus className="mr-2 h-4 w-4" />
-                Novo produto
-              </Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="outline">
@@ -562,11 +598,14 @@ const AdminShop = () => {
     <Card className="shadow-card border-border">
       <CardHeader>
         <CardTitle>Produtos cadastrados</CardTitle>
+        <p className="text-sm text-muted-foreground mt-1">
+          Produtos cadastrados no estoque aparecem aqui para edição e publicação na loja.
+        </p>
       </CardHeader>
       <CardContent className="space-y-3">
         {inventory.storeProducts.length === 0 && (
           <p className="text-sm text-muted-foreground">
-            Nenhum produto cadastrado. Utilize o botão &quot;Novo produto&quot; para adicionar itens à loja.
+            Nenhum produto cadastrado no estoque. Cadastre produtos primeiro em &quot;Gestão de Estoque&quot;.
           </p>
         )}
         {inventory.storeProducts.map((product) => {
@@ -594,11 +633,20 @@ const AdminShop = () => {
                       {currencyFormatter.format(product.price)}
                     </span>
                   </div>
-                  <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     <span className="inline-flex items-center gap-1">
                       <Star className="h-3 w-3 text-primary" />
                       {product.rating.toFixed(1)}
                     </span>
+                    <span className="inline-flex items-center gap-1">
+                      <Package className="h-3 w-3 text-primary" />
+                      {product.quantity} un.
+                    </span>
+                    {product.vipDiscount > 0 && (
+                      <Badge variant="outline" className="text-[10px]">
+                        VIP -{product.vipDiscount}%
+                      </Badge>
+                    )}
                     {product.vipPromotionLabel && (
                       <Badge variant="outline" className="text-[10px]">
                         {product.vipPromotionLabel}
@@ -612,19 +660,18 @@ const AdminShop = () => {
         })}
       </CardContent>
       <CardFooter className="text-xs text-muted-foreground">
-        {inventory.storeProducts.length} produto(s) publicados
+        {inventory.storeProducts.length} produto(s) cadastrado(s) no estoque
       </CardFooter>
     </Card>
 
     <Card className="shadow-card border-border xl:col-span-1">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle>{activeProduct ? "Editar produto" : "Novo produto"}</CardTitle>
-          <Button variant="secondary" size="sm" onClick={addNewProduct}>
-            <Plus className="mr-2 h-4 w-4" />
-            Novo produto
-          </Button>
-        </div>
+        <CardTitle>{activeProduct ? "Editar produto" : "Selecione um produto"}</CardTitle>
+        {!activeProduct && (
+          <p className="text-sm text-muted-foreground mt-1">
+            Selecione um produto cadastrado no estoque para editar e publicar na loja.
+          </p>
+        )}
       </CardHeader>
       <CardContent>
         <form className="space-y-5" onSubmit={upsertProduct}>

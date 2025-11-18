@@ -30,6 +30,7 @@ import {
   StoreProduct,
 } from "@/data/inventory";
 import { loadInventory, persistInventory, resetInventory } from "@/lib/inventory-storage";
+import { loadBarbershops } from "@/lib/barbershops-storage";
 import {
   AlertCircle,
   ArrowLeft,
@@ -101,6 +102,7 @@ const AdminInventory = () => {
   const [productForm, setProductForm] = useState<ProductFormState>(INITIAL_PRODUCT_FORM);
   const [consumableForm, setConsumableForm] = useState<ConsumableFormState>(INITIAL_CONSUMABLE_FORM);
   const [currentTab, setCurrentTab] = useState<"store" | "consumables">("store");
+  const [activeBarbershopId, setActiveBarbershopId] = useState<string | null>(null);
   const initializedRef = useRef(false);
   const alertedRef = useRef<{ store: Set<string>; consumables: Set<string> }>({
     store: new Set(),
@@ -110,18 +112,83 @@ const AdminInventory = () => {
   const isLowStock = (quantity: number, minStock: number) => quantity <= minStock;
 
   useEffect(() => {
-    const data = loadInventory();
-    setInventory(data);
-    setActiveProductId(data.storeProducts[0]?.id ?? null);
-    setActiveConsumableId(data.consumables[0]?.id ?? null);
-    initializedRef.current = true;
+    let isInternalUpdate = false;
+    
+    const loadData = () => {
+      if (isInternalUpdate) {
+        return;
+      }
+      
+      const barbershops = loadBarbershops();
+      const storedActiveId = localStorage.getItem("admin_active_barbershop_id");
+      const storedMatch = storedActiveId ? barbershops.find((shop) => shop.id === storedActiveId) : null;
+      const fallbackBarbershop = barbershops[0] ?? null;
+      const targetBarbershop = storedMatch ?? fallbackBarbershop;
+      const resolvedBarbershopId = targetBarbershop?.id ?? null;
+
+      setActiveBarbershopId(resolvedBarbershopId);
+
+      const data = loadInventory(resolvedBarbershopId);
+      setInventory(data);
+      setActiveProductId(data.storeProducts[0]?.id ?? null);
+      setActiveConsumableId(data.consumables[0]?.id ?? null);
+      initializedRef.current = true;
+    };
+
+    loadData();
+
+    const handleStorageChange = (event: StorageEvent) => {
+      if (
+        event.key === "admin_active_barbershop_id" ||
+        event.key?.startsWith("barberbook_admin_inventory")
+      ) {
+        loadData();
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+
+    const handleLocalStorageChange = () => {
+      if (!isInternalUpdate) {
+        loadData();
+      }
+    };
+
+    const originalSetItem = localStorage.setItem;
+    localStorage.setItem = function(...args) {
+      const isInventoryKey = args[0] === "admin_active_barbershop_id" || args[0]?.startsWith("barberbook_admin_inventory");
+      
+      if (isInventoryKey && !args[0]?.includes("_default") && initializedRef.current) {
+        isInternalUpdate = true;
+        originalSetItem.apply(this, args);
+        setTimeout(() => {
+          isInternalUpdate = false;
+        }, 100);
+      } else {
+        originalSetItem.apply(this, args);
+      }
+      
+      if (isInventoryKey && !isInternalUpdate) {
+        handleLocalStorageChange();
+      }
+    };
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      localStorage.setItem = originalSetItem;
+    };
   }, []);
 
   useEffect(() => {
     if (!initializedRef.current) {
       return;
     }
-    persistInventory(inventory);
+    const storedActiveId = localStorage.getItem("admin_active_barbershop_id");
+    const barbershopId = storedActiveId || activeBarbershopId;
+    
+    const timeoutId = setTimeout(() => {
+      persistInventory(inventory, barbershopId);
+    }, 300);
 
     const alertedStore = alertedRef.current.store;
     const alertedConsumables = alertedRef.current.consumables;
@@ -151,7 +218,9 @@ const AdminInventory = () => {
         alertedConsumables.delete(item.id);
       }
     });
-  }, [inventory]);
+    
+    return () => clearTimeout(timeoutId);
+  }, [inventory, activeBarbershopId]);
 
   const currencyFormatter = useMemo(
     () => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }),
@@ -478,8 +547,10 @@ const AdminInventory = () => {
   };
 
   const handleResetInventory = () => {
-    resetInventory();
-    const data = loadInventory();
+    const storedActiveId = localStorage.getItem("admin_active_barbershop_id");
+    const barbershopId = storedActiveId || activeBarbershopId;
+    resetInventory(barbershopId);
+    const data = loadInventory(barbershopId);
     setInventory(data);
     setActiveProductId(data.storeProducts[0]?.id ?? null);
     setActiveConsumableId(data.consumables[0]?.id ?? null);
@@ -490,8 +561,17 @@ const AdminInventory = () => {
   };
 
   const addNewProduct = () => {
+    setCurrentTab("store");
     setActiveProductId(null);
     setProductForm(INITIAL_PRODUCT_FORM);
+    
+    setTimeout(() => {
+      const formElement = document.getElementById("product-name");
+      if (formElement) {
+        formElement.scrollIntoView({ behavior: "smooth", block: "center" });
+        formElement.focus();
+      }
+    }, 100);
   };
 
   const addNewConsumable = () => {
@@ -522,7 +602,7 @@ const AdminInventory = () => {
             <div className="flex flex-wrap gap-3">
               <Button variant="secondary" onClick={addNewProduct}>
                 <Plus className="mr-2 h-4 w-4" />
-                Novo produto
+                + ADD Produto
               </Button>
               <Button variant="secondary" onClick={addNewConsumable}>
                 <Plus className="mr-2 h-4 w-4" />
