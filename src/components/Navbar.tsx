@@ -13,7 +13,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "./ui/alert-dialog";
-import { Scissors, Menu, X, Calendar, ShoppingBag, LayoutDashboard, LogIn, LogOut } from "lucide-react";
+import { Scissors, Menu, X, Calendar, ShoppingBag, LayoutDashboard, LogIn } from "lucide-react";
 
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -101,36 +101,12 @@ export const Navbar = () => {
             <div className="hidden md:flex items-center space-x-4">
               <ThemeToggle />
               {activeCollaborator?.role === "socio" ? (
-                <>
                 <Link to="/admin">
                   <Button variant="ghost" size="sm">
                     <LayoutDashboard className="h-4 w-4 mr-2" />
                     Admin
                   </Button>
                 </Link>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="outline" size="sm">
-                        <LogOut className="h-4 w-4 mr-2" />
-                        Sair
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Confirmar saída</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Tem certeza que deseja sair da área administrativa?
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleLogout}>
-                          Sair
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </>
               ) : activeCollaborator ? (
                 <Link to="/menu">
                   <Button variant="ghost" size="sm">
@@ -179,36 +155,12 @@ export const Navbar = () => {
               <div className="px-4 pt-3 space-y-2 border-t border-border">
                 <ThemeToggle />
                 {activeCollaborator?.role === "socio" && (
-                  <>
                   <Link to="/admin" onClick={() => setIsOpen(false)}>
                     <Button variant="ghost" className="w-full justify-start">
                       <LayoutDashboard className="h-4 w-4 mr-2" />
                       Admin
                     </Button>
                   </Link>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="outline" className="w-full justify-start" onClick={() => setIsOpen(false)}>
-                          <LogOut className="h-4 w-4 mr-2" />
-                          Sair
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Confirmar saída</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Tem certeza que deseja sair da área administrativa?
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction onClick={handleLogout}>
-                            Sair
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </>
                 )}
                 {activeCollaborator && activeCollaborator.role !== "socio" && (
                   <Link to="/menu" onClick={() => setIsOpen(false)}>

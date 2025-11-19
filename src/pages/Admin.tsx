@@ -1,5 +1,16 @@
 import { Navbar } from "@/components/Navbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+	AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   Calendar,
   Users,
@@ -272,6 +283,14 @@ const Admin = () => {
     return stat;
   });
 
+  const logout = () => {
+    try {
+      localStorage.removeItem("adminAuth");
+      localStorage.removeItem("activeCollaborator");
+    } finally {
+      navigate("/");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -281,9 +300,25 @@ const Admin = () => {
         <div className="container mx-auto px-4">
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-4xl font-display font-bold mb-2">
-              Dashboard <span className="text-primary">Administrativo</span>
-            </h1>
+            <div className="flex items-center justify-between mb-2">
+              <h1 className="text-4xl font-display font-bold">
+                Dashboard <span className="text-primary">Administrativo</span>
+              </h1>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" size="sm">Sair</Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Deseja realmente sair?</AlertDialogTitle>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={logout}>Sair</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
             <p className="text-muted-foreground">Visão geral da sua barbearia</p>
           </div>
 

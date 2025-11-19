@@ -289,28 +289,6 @@ const AdminVip = () => {
               </div>
             </div>
             <div className="flex flex-wrap gap-3">
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="outline">
-                    <RefreshCcw className="mr-2 h-4 w-4" />
-                    Restaurar padrão
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Restaurar dados padrão?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Essa ação substitui preços, benefícios e clientes cadastrados pelas informações iniciais.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleResetVipData}>
-                      Confirmar
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
             </div>
           </div>
 

@@ -1042,6 +1042,14 @@ const Booking = () => {
                                         <div className="grid grid-cols-4 gap-2">
                                           {(() => {
                                             const times = getAvailableTimesForBarber(tempBarberId, currentDate);
+                                            if (times.length === 0) {
+                                              return (
+                                                <div className="col-span-4 text-center py-8 px-4 bg-secondary/50 rounded-lg border border-border">
+                                                  <p className="text-muted-foreground font-medium">Horários Esgotados</p>
+                                                  <p className="text-sm text-muted-foreground mt-1">Não há horários disponíveis para este dia.</p>
+                                                </div>
+                                              );
+                                            }
                                             return times.map((time) => {
                                               const isSelected = tempTime === time;
                                               const isAvailable = times.includes(time);
@@ -1314,7 +1322,7 @@ const Booking = () => {
                                         cell: "h-12 w-12 text-center text-sm p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-accent/50 [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
                                         day: "h-12 w-12 p-0 font-normal text-base aria-selected:opacity-100",
                                         day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
-                                        day_today: "bg-accent text-accent-foreground font-semibold",
+                                        day_today: "border-2 border-primary font-semibold",
                                         day_outside: "text-muted-foreground opacity-30",
                                         day_disabled: "text-muted-foreground opacity-30 cursor-not-allowed",
                                       }}
@@ -1328,6 +1336,18 @@ const Booking = () => {
                                     {(() => {
                                       const unassigned = getUnassignedServices();
                                       const requiredSlots = getRequiredSlotsForUnassignedServices();
+                                      const selectedBarberTimes = tempBarberId && currentDate
+                                        ? getAvailableTimesForBarber(tempBarberId, currentDate)
+                                        : [];
+                                      
+                                      if (selectedBarberTimes.length === 0) {
+                                        return (
+                                          <div className="text-center py-8 px-4 bg-secondary/50 rounded-lg border border-border">
+                                            <p className="text-muted-foreground font-medium">Horários Esgotados</p>
+                                            <p className="text-sm text-muted-foreground mt-1">Não há horários disponíveis para este dia.</p>
+                                          </div>
+                                        );
+                                      }
                                       
                                       return (
                                         <>

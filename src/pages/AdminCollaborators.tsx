@@ -298,28 +298,6 @@ const AdminCollaborators = () => {
                 <Plus className="mr-2 h-4 w-4" />
                 Novo colaborador
               </Button>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="outline">
-                    <RefreshCcw className="mr-2 h-4 w-4" />
-                    Restaurar padrão
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Restaurar lista padrão?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Essa ação substitui todos os colaboradores cadastrados pelos dados iniciais.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleReset}>
-                      Confirmar
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
             </div>
           </div>
 

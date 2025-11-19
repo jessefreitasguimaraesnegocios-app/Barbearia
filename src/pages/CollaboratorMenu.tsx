@@ -8,13 +8,15 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { loadCollaborators, persistCollaborators } from "@/lib/collaborators-storage";
 import { Collaborator } from "@/data/collaborators";
+import { hashPassword } from "@/lib/password";
 import { loadServices } from "@/lib/services-storage";
 import { ServiceItem } from "@/data/services";
 import { loadVipData } from "@/lib/vips-storage";
 import { VipMember } from "@/data/vips";
 import { Badge } from "@/components/ui/badge";
-import { User, Calendar, Clock } from "lucide-react";
-import { parseISO, isSameDay, isAfter, startOfToday } from "date-fns";
+import { User, Calendar, Clock, History, ChevronDown, Copy, Pencil, Eye, EyeOff } from "lucide-react";
+import { parseISO, isSameDay, isAfter, startOfToday, subMonths, format, eachDayOfInterval } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -25,6 +27,20 @@ import {
 	AlertDialogTitle,
 	AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+	DialogDescription,
+} from "@/components/ui/dialog";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 
 type ActiveCollaborator = {
 	id: string;
@@ -71,6 +87,10 @@ const todayKey = () => {
 	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
+const dateKey = (date: Date) => {
+	return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+};
+
 const CollaboratorMenu = () => {
 	const navigate = useNavigate();
 	const { toast } = useToast();
@@ -88,10 +108,20 @@ const CollaboratorMenu = () => {
 		photoUrl: "",
 		experience: "",
 		workSchedule: "",
+		password: "",
+		confirmPassword: "",
 	});
 	const [allBookings, setAllBookings] = useState<BookingConfirmation[]>([]);
 	const [services, setServices] = useState<ServiceItem[]>([]);
 	const [vipMembers, setVipMembers] = useState<VipMember[]>([]);
+	const [historyOpen, setHistoryOpen] = useState(false);
+	const [selectedMonth, setSelectedMonth] = useState<string>("all");
+	const [selectedAppointment, setSelectedAppointment] = useState<{
+		apt: AppointmentData & { serviceName: string };
+		payment: { fullName: string; phone: string; cpf: string };
+	} | null>(null);
+	const [showPassword, setShowPassword] = useState(false);
+	const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
 	const storageKey = useMemo(() => {
 		return active ? `time_clock_${active.id}_${todayKey()}` : "";
@@ -116,6 +146,8 @@ const CollaboratorMenu = () => {
 					photoUrl: found.photoUrl || "",
 					experience: found.experience || "",
 					workSchedule: found.workSchedule || "",
+					password: "",
+					confirmPassword: "",
 				});
 			}
 		}
@@ -266,6 +298,91 @@ const CollaboratorMenu = () => {
 
 	const hasRecordedToday = (type: TimeClockRecord["type"]): boolean => {
 		return records.some((record) => record.type === type);
+	};
+
+	const getHistoryRecords = (): Array<{ date: string; records: TimeClockRecord[] }> => {
+		if (!active) return [];
+
+		const sixMonthsAgo = subMonths(new Date(), 6);
+		const today = new Date();
+		const allDays = eachDayOfInterval({ start: sixMonthsAgo, end: today });
+
+		const historyData: Array<{ date: string; records: TimeClockRecord[] }> = [];
+
+		allDays.forEach((day) => {
+			const key = `time_clock_${active.id}_${dateKey(day)}`;
+			try {
+				const raw = localStorage.getItem(key);
+				if (raw) {
+					const dayRecords = JSON.parse(raw) as TimeClockRecord[];
+					if (dayRecords && dayRecords.length > 0) {
+						historyData.push({
+							date: dateKey(day),
+							records: dayRecords,
+						});
+					}
+				}
+			} catch {
+				// Ignore invalid entries
+			}
+		});
+
+		return historyData;
+	};
+
+	const getGroupedHistory = () => {
+		const historyRecords = getHistoryRecords();
+		const grouped: Record<string, Array<{ date: string; records: TimeClockRecord[] }>> = {};
+
+		historyRecords.forEach((item) => {
+			const recordDate = parseISO(item.date);
+			const monthKey = format(recordDate, "yyyy-MM");
+
+			if (!grouped[monthKey]) {
+				grouped[monthKey] = [];
+			}
+			grouped[monthKey].push(item);
+		});
+
+		// Sort months descending (most recent first)
+		const sortedMonths = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+
+		const allMonths = sortedMonths.map((monthKey) => {
+			const monthName = format(parseISO(`${monthKey}-01`), "MMMM yyyy", { locale: ptBR });
+			return {
+				monthKey,
+				monthName: monthName.charAt(0).toUpperCase() + monthName.slice(1),
+				days: grouped[monthKey].sort((a, b) => b.date.localeCompare(a.date)),
+			};
+		});
+
+		// Filter by selected month
+		if (selectedMonth === "all") {
+			return allMonths;
+		}
+
+		return allMonths.filter((month) => month.monthKey === selectedMonth);
+	};
+
+	const getAvailableMonths = () => {
+		const historyRecords = getHistoryRecords();
+		const monthSet = new Set<string>();
+
+		historyRecords.forEach((item) => {
+			const recordDate = parseISO(item.date);
+			const monthKey = format(recordDate, "yyyy-MM");
+			monthSet.add(monthKey);
+		});
+
+		const sortedMonths = Array.from(monthSet).sort((a, b) => b.localeCompare(a));
+
+		return sortedMonths.map((monthKey) => {
+			const monthName = format(parseISO(`${monthKey}-01`), "MMMM yyyy", { locale: ptBR });
+			return {
+				monthKey,
+				monthName: monthName.charAt(0).toUpperCase() + monthName.slice(1),
+			};
+		});
 	};
 
 	const parseWorkSchedule = (schedule: string): { start: number; end: number } | null => {
@@ -421,6 +538,26 @@ const CollaboratorMenu = () => {
 			return;
 		}
 
+		if (formData.password || formData.confirmPassword) {
+			if (formData.password.length < 6) {
+				toast({
+					variant: "destructive",
+					title: "Senha muito curta",
+					description: "A senha deve ter pelo menos 6 caracteres.",
+				});
+				return;
+			}
+
+			if (formData.password !== formData.confirmPassword) {
+				toast({
+					variant: "destructive",
+					title: "Senhas não coincidem",
+					description: "As senhas digitadas não são iguais.",
+				});
+				return;
+			}
+		}
+
 		const collaborators = loadCollaborators();
 		const updatedCollaborators = collaborators.map((c) =>
 			c.id === collaborator.id
@@ -433,6 +570,7 @@ const CollaboratorMenu = () => {
 					photoUrl: formData.photoUrl.trim() || undefined,
 					experience: formData.experience.trim() || undefined,
 					workSchedule: formData.workSchedule.trim() || undefined,
+					...(formData.password ? { password: hashPassword(formData.password) } : {}),
 				}
 				: c
 		);
@@ -453,9 +591,10 @@ const CollaboratorMenu = () => {
 		}
 
 		setIsEditing(false);
+		setFormData((prev) => ({ ...prev, password: "", confirmPassword: "" }));
 		toast({
 			title: "Perfil atualizado",
-			description: "Seus dados foram salvos com sucesso.",
+			description: formData.password ? "Seus dados e senha foram salvos com sucesso." : "Seus dados foram salvos com sucesso.",
 		});
 	};
 
@@ -464,6 +603,34 @@ const CollaboratorMenu = () => {
 			localStorage.removeItem("activeCollaborator");
 		} finally {
 			navigate("/");
+		}
+	};
+
+	const copyToClipboard = async (text: string, label: string) => {
+		try {
+			if (navigator.clipboard && navigator.clipboard.writeText) {
+				await navigator.clipboard.writeText(text);
+			} else {
+				const textArea = document.createElement("textarea");
+				textArea.value = text;
+				textArea.style.position = "fixed";
+				textArea.style.left = "-999999px";
+				document.body.appendChild(textArea);
+				textArea.focus();
+				textArea.select();
+				document.execCommand("copy");
+				textArea.remove();
+			}
+			toast({
+				title: "Copiado!",
+				description: `${label} copiado para a área de transferência.`,
+			});
+		} catch (err) {
+			toast({
+				variant: "destructive",
+				title: "Erro",
+				description: "Não foi possível copiar para a área de transferência.",
+			});
 		}
 	};
 
@@ -477,7 +644,12 @@ const CollaboratorMenu = () => {
 							<div className="flex items-center justify-between">
 								<CardTitle>Perfil</CardTitle>
 								{!isEditing && (
-									<Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={() => setIsEditing(true)}
+									>
+										<Pencil className="h-4 w-4 mr-2" />
 										Editar
 									</Button>
 								)}
@@ -488,12 +660,12 @@ const CollaboratorMenu = () => {
 								<>
 									<div className="space-y-4">
 										<div className="flex flex-col items-center gap-4">
-											<div className="h-24 w-24 rounded-full overflow-hidden bg-secondary border-2 border-primary">
+											<div className="h-24 w-24 rounded-full overflow-hidden bg-secondary border-2 border-primary group">
 												{formData.photoUrl ? (
 													<img
 														src={formData.photoUrl}
 														alt={formData.name || "Foto de perfil"}
-														className="h-full w-full object-cover"
+														className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-500"
 													/>
 												) : (
 													<div className="h-full w-full flex items-center justify-center">
@@ -592,6 +764,50 @@ const CollaboratorMenu = () => {
 											<Input value={collaborator?.role || "-"} disabled />
 										</div>
 
+										<div className="space-y-2">
+											<Label htmlFor="password">Alterar senha</Label>
+											<div className="relative">
+												<Input
+													id="password"
+													type={showPassword ? "text" : "password"}
+													value={formData.password}
+													onChange={(e) => handleFormChange("password", e.target.value)}
+													placeholder="Digite a nova senha"
+													className="pr-10"
+												/>
+												<button
+													type="button"
+													onClick={() => setShowPassword(!showPassword)}
+													className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
+													aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+												>
+													{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+												</button>
+											</div>
+										</div>
+
+										<div className="space-y-2">
+											<Label htmlFor="confirmPassword">Confirmar senha</Label>
+											<div className="relative">
+												<Input
+													id="confirmPassword"
+													type={showConfirmPassword ? "text" : "password"}
+													value={formData.confirmPassword}
+													onChange={(e) => handleFormChange("confirmPassword", e.target.value)}
+													placeholder="Confirme a nova senha"
+													className="pr-10"
+												/>
+												<button
+													type="button"
+													onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+													className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
+													aria-label={showConfirmPassword ? "Ocultar senha" : "Mostrar senha"}
+												>
+													{showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+												</button>
+											</div>
+										</div>
+
 										<div className="flex gap-2 pt-2">
 											<Button variant="hero" onClick={handleSaveProfile} className="flex-1">
 												Salvar
@@ -609,8 +825,12 @@ const CollaboratorMenu = () => {
 															photoUrl: collaborator.photoUrl || "",
 															experience: collaborator.experience || "",
 															workSchedule: collaborator.workSchedule || "",
+															password: "",
+															confirmPassword: "",
 														});
 													}
+													setShowPassword(false);
+													setShowConfirmPassword(false);
 												}}
 											>
 												Cancelar
@@ -621,12 +841,12 @@ const CollaboratorMenu = () => {
 							) : (
 								<>
 									<div className="flex flex-col items-center gap-4 mb-6">
-										<div className="h-24 w-24 rounded-full overflow-hidden bg-secondary border-2 border-primary">
+										<div className="h-24 w-24 rounded-full overflow-hidden bg-secondary border-2 border-primary group">
 											{collaborator?.photoUrl ? (
 												<img
 													src={collaborator.photoUrl}
 													alt={collaborator.name}
-													className="h-full w-full object-cover"
+													className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-500"
 												/>
 											) : (
 												<div className="h-full w-full flex items-center justify-center">
@@ -673,12 +893,20 @@ const CollaboratorMenu = () => {
 
 					<Card className="shadow-card border-border">
 						<CardHeader>
-							<CardTitle>Registro de Ponto (Hoje)</CardTitle>
-							{collaborator?.workSchedule && (
-								<p className="text-sm text-muted-foreground mt-1">
-									Carga horária: {collaborator.workSchedule}
-								</p>
-							)}
+							<div className="flex items-center justify-between">
+								<div>
+									<CardTitle>Registro de Ponto (Hoje)</CardTitle>
+									{collaborator?.workSchedule && (
+										<p className="text-sm text-muted-foreground mt-1">
+											Carga horária: {collaborator.workSchedule}
+										</p>
+									)}
+								</div>
+								<Button variant="outline" size="sm" onClick={() => setHistoryOpen(true)}>
+									<History className="h-4 w-4 mr-2" />
+									Histórico
+								</Button>
+							</div>
 						</CardHeader>
 						<CardContent className="space-y-4">
 							<div className="flex flex-wrap gap-2">
@@ -731,7 +959,22 @@ const CollaboratorMenu = () => {
 								{records.map((r, idx) => (
 									<li key={idx} className="flex items-center justify-between rounded-md border border-border px-3 py-2">
 										<span className="capitalize">{r.type.replace("-", " ")}</span>
-										<span className="text-muted-foreground">{new Date(r.timestamp).toLocaleTimeString()}</span>
+										<div className="flex items-center gap-6 text-muted-foreground">
+											<span>
+												{new Date(r.timestamp).toLocaleDateString("pt-BR", {
+													day: "2-digit",
+													month: "2-digit",
+													year: "numeric",
+												})}
+											</span>
+											<span>
+												{new Date(r.timestamp).toLocaleTimeString("pt-BR", {
+													hour: "2-digit",
+													minute: "2-digit",
+													second: "2-digit",
+												})}
+											</span>
+										</div>
 									</li>
 								))}
 								{records.length === 0 && <div className="text-sm text-muted-foreground">Sem registros hoje.</div>}
@@ -759,6 +1002,82 @@ const CollaboratorMenu = () => {
 							})()}
 						</CardContent>
 					</Card>
+
+					<Dialog open={historyOpen} onOpenChange={(open) => {
+						setHistoryOpen(open);
+						if (!open) {
+							setSelectedMonth("all");
+						}
+					}}>
+						<DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+							<DialogHeader>
+								<DialogTitle>Histórico de Registros (Últimos 6 Meses)</DialogTitle>
+							</DialogHeader>
+							<div className="space-y-6 mt-4">
+								{(() => {
+									const groupedHistory = getGroupedHistory();
+									if (groupedHistory.length === 0) {
+										return <div className="text-sm text-muted-foreground text-center py-8">Nenhum registro encontrado.</div>;
+									}
+
+									return groupedHistory.map((month) => (
+										<div key={month.monthKey} className="space-y-3">
+											<div className="flex items-center gap-2 border-b border-border pb-2">
+												<h3 className="text-lg font-semibold text-primary flex-1">
+													{month.monthName}
+												</h3>
+												<Select value={selectedMonth} onValueChange={setSelectedMonth}>
+													<SelectTrigger className="w-[180px] h-8 border-none shadow-none bg-transparent hover:bg-accent">
+														<SelectValue placeholder="Selecionar mês" />
+													</SelectTrigger>
+													<SelectContent>
+														<SelectItem value="all">Todos os meses</SelectItem>
+														{getAvailableMonths().map((m) => (
+															<SelectItem key={m.monthKey} value={m.monthKey}>
+																{m.monthName}
+															</SelectItem>
+														))}
+													</SelectContent>
+												</Select>
+											</div>
+											<div className="space-y-2">
+												{month.days.map((day) => (
+													<div key={day.date} className="space-y-2">
+														<div className="text-sm font-medium text-muted-foreground">
+															{format(parseISO(day.date), "dd/MM/yyyy", { locale: ptBR })}
+														</div>
+														<ul className="space-y-1 ml-4">
+															{day.records.map((r, idx) => (
+																<li key={idx} className="flex items-center justify-between rounded-md border border-border px-3 py-2 bg-secondary/50">
+																	<span className="capitalize">{r.type.replace("-", " ")}</span>
+																	<div className="flex items-center gap-6 text-muted-foreground">
+																		<span>
+																			{new Date(r.timestamp).toLocaleDateString("pt-BR", {
+																				day: "2-digit",
+																				month: "2-digit",
+																				year: "numeric",
+																			})}
+																		</span>
+																		<span>
+																			{new Date(r.timestamp).toLocaleTimeString("pt-BR", {
+																				hour: "2-digit",
+																				minute: "2-digit",
+																				second: "2-digit",
+																			})}
+																		</span>
+																	</div>
+																</li>
+															))}
+														</ul>
+													</div>
+												))}
+											</div>
+										</div>
+									));
+								})()}
+							</div>
+						</DialogContent>
+					</Dialog>
 
 					<Card className="md:col-span-2 shadow-card border-border">
 						<CardHeader>
@@ -818,10 +1137,25 @@ const CollaboratorMenu = () => {
 
 								return (
 									<div className="space-y-3">
-										{upcomingAppointments.map((item, idx) => (
+										{upcomingAppointments.map((item, idx) => {
+											const booking = allBookings.find((b) => 
+												b.appointments.some((a) => a.id === item.appointment.id)
+											);
+											return (
 											<div
 												key={`${item.appointment.id}-${idx}`}
-												className="flex items-center justify-between rounded-md border border-border px-4 py-3 hover:bg-secondary/50 transition-colors"
+												className="flex items-center justify-between rounded-md border border-border px-4 py-3 hover:bg-secondary/50 transition-colors cursor-pointer"
+												onClick={() => {
+													if (booking && item.service) {
+														setSelectedAppointment({
+															apt: {
+																...item.appointment,
+																serviceName: item.service.title,
+															},
+															payment: booking.payment,
+														});
+													}
+												}}
 											>
 												<div className="flex-1">
 													<div className="flex items-center gap-2 mb-1">
@@ -856,12 +1190,73 @@ const CollaboratorMenu = () => {
 													</div>
 												</div>
 											</div>
-										))}
+											);
+										})}
 									</div>
 								);
 							})()}
 						</CardContent>
 					</Card>
+
+					<Dialog open={!!selectedAppointment} onOpenChange={(open) => !open && setSelectedAppointment(null)}>
+						<DialogContent className="sm:max-w-md">
+							<DialogHeader>
+								<DialogTitle>Informações do Cliente</DialogTitle>
+								<DialogDescription>
+									{selectedAppointment && `Dados do cliente para o agendamento de ${selectedAppointment.apt.serviceName}`}
+								</DialogDescription>
+							</DialogHeader>
+							{selectedAppointment && (
+								<div className="space-y-4 pt-4">
+									<div className="space-y-2">
+										<label className="text-sm font-medium text-muted-foreground">Nome Completo</label>
+										<div className="flex items-center justify-between gap-2">
+											<p className="text-base font-semibold flex-1">{selectedAppointment.payment.fullName}</p>
+											<Button
+												variant="ghost"
+												size="icon"
+												className="h-8 w-8"
+												onClick={() => copyToClipboard(selectedAppointment.payment.fullName, "Nome completo")}
+												aria-label="Copiar nome completo"
+											>
+												<Copy className="h-4 w-4" />
+											</Button>
+										</div>
+									</div>
+									<div className="space-y-2">
+										<label className="text-sm font-medium text-muted-foreground">Número de Telefone</label>
+										<div className="flex items-center justify-between gap-2">
+											<p className="text-base font-semibold flex-1">{selectedAppointment.payment.phone}</p>
+											<Button
+												variant="ghost"
+												size="icon"
+												className="h-8 w-8"
+												onClick={() => copyToClipboard(selectedAppointment.payment.phone, "Telefone")}
+												aria-label="Copiar telefone"
+											>
+												<Copy className="h-4 w-4" />
+											</Button>
+										</div>
+									</div>
+									<div className="space-y-2">
+										<label className="text-sm font-medium text-muted-foreground">CPF</label>
+										<div className="flex items-center justify-between gap-2">
+											<p className="text-base font-semibold flex-1">{selectedAppointment.payment.cpf}</p>
+											<Button
+												variant="ghost"
+												size="icon"
+												className="h-8 w-8"
+												onClick={() => copyToClipboard(selectedAppointment.payment.cpf, "CPF")}
+												aria-label="Copiar CPF"
+											>
+												<Copy className="h-4 w-4" />
+											</Button>
+										</div>
+									</div>
+								</div>
+							)}
+						</DialogContent>
+					</Dialog>
 				</div>
 			</main>
 		</div>

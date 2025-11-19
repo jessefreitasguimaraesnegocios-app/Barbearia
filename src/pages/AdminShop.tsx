@@ -652,16 +652,6 @@ const AdminShop = () => {
       <CardHeader>
         <div className="flex items-center justify-between gap-4">
           <CardTitle className="flex-1">{activeProduct ? "Editar produto" : "Selecione um produto"}</CardTitle>
-          <div className="flex gap-2 flex-shrink-0">
-            <Button variant="secondary" size="sm" onClick={addNewProduct}>
-              <Plus className="h-4 w-4" />
-              ADD Produto
-            </Button>
-          <Button variant="secondary" size="sm" onClick={addNewProduct}>
-              <Plus className="h-4 w-4" />
-              ADD Produto
-          </Button>
-          </div>
         </div>
         {!activeProduct && (
           <p className="text-sm text-muted-foreground mt-1">
