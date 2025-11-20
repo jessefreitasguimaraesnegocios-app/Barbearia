@@ -7,8 +7,10 @@ import { ArrowLeft, DollarSign, TrendingUp, TrendingDown, Wallet, Scissors, Shop
 import { loadServices } from "@/lib/services-storage";
 import { loadCollaborators } from "@/lib/collaborators-storage";
 import { loadInventory } from "@/lib/inventory-storage";
+import { loadVipData } from "@/lib/vips-storage";
 import { DEFAULT_SERVICES, ServiceItem } from "@/data/services";
 import { Collaborator, PaymentMethod } from "@/data/collaborators";
+import { VipData } from "@/data/vips";
 import { format, startOfMonth, endOfMonth, parseISO, isWithinInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Expense } from "./AdminExpenses";
@@ -50,6 +52,7 @@ const AdminFinances = () => {
   const [allBookings, setAllBookings] = useState<BookingConfirmation[]>([]);
   const [shopSales, setShopSales] = useState<ShopSale[]>([]);
   const [manualExpenses, setManualExpenses] = useState<Expense[]>([]);
+  const [vipData, setVipData] = useState<VipData>(loadVipData());
 
   useEffect(() => {
     const nextServices = loadServices();
@@ -113,7 +116,10 @@ const AdminFinances = () => {
       }
     }
     setShopSales(allSales);
-
+    
+    const nextVipData = loadVipData();
+    setVipData(nextVipData);
+    
     const storedExpenses = localStorage.getItem("barberbook_admin_expenses");
     if (storedExpenses) {
       try {
@@ -136,7 +142,12 @@ const AdminFinances = () => {
       }
     }
 
-    const handleStorageChange = () => {
+    const handleStorageChange = (event?: StorageEvent) => {
+      if (event?.key === "barberbook_admin_vips") {
+        const nextVipData = loadVipData();
+        setVipData(nextVipData);
+      }
+      
       const storedExpenses = localStorage.getItem("barberbook_admin_expenses");
       if (storedExpenses) {
         try {
@@ -165,9 +176,19 @@ const AdminFinances = () => {
     window.addEventListener("storage", handleStorageChange);
     window.addEventListener("focus", handleStorageChange);
     
+    const originalSetItem = localStorage.setItem;
+    localStorage.setItem = function(...args) {
+      originalSetItem.apply(this, args);
+      if (args[0] === "barberbook_admin_vips") {
+        const nextVipData = loadVipData();
+        setVipData(nextVipData);
+      }
+    };
+    
     return () => {
       window.removeEventListener("storage", handleStorageChange);
       window.removeEventListener("focus", handleStorageChange);
+      localStorage.setItem = originalSetItem;
     };
   }, []);
 
@@ -224,12 +245,27 @@ const AdminFinances = () => {
 
   const { barbershopRevenue, shopRevenue } = useMemo(() => getMonthData(), [allBookings, services, collaborators, shopSales]);
 
-  const appointmentRevenue = useMemo(() => {
-    return barbershopRevenue.reduce((sum, apt) => sum + apt.price, 0);
-  }, [barbershopRevenue]);
-
   const chairRentalRevenue = useMemo(() => {
     let totalRental = 0;
+    
+    collaborators.forEach((collaborator) => {
+      const paymentMethod = collaborator.paymentMethod;
+      const isChairRental = paymentMethod === "aluguel-cadeira-100" || 
+                            paymentMethod === "aluguel-cadeira-50" ||
+                            paymentMethod === "recebe-100-por-cliente" ||
+                            paymentMethod === "recebe-50-por-cliente";
+      
+      // Usar apenas o valor personalizado do campo "Alugar Cadeira"
+      if (isChairRental && collaborator.chairRentalAmount && collaborator.chairRentalAmount > 0) {
+        totalRental += collaborator.chairRentalAmount;
+      }
+    });
+    
+    return totalRental;
+  }, [collaborators]);
+
+  const revenueWithoutChairRental = useMemo(() => {
+    const barbersWithChairRental = new Set<string>();
     
     collaborators.forEach((collaborator) => {
       const paymentMethod = collaborator.paymentMethod;
@@ -237,29 +273,32 @@ const AdminFinances = () => {
       const is50Percent = paymentMethod === "aluguel-cadeira-50" || paymentMethod === "recebe-50-por-cliente";
       
       if (is100Percent || is50Percent) {
-        const barberId = collaborator.id;
+        barbersWithChairRental.add(collaborator.id);
         const barberSlug = getBarberIdFromCollaborator(collaborator);
-        
-        const barberAppointments = barbershopRevenue.filter((apt) => 
-          apt.barberId === barberId || apt.barberId === barberSlug
-        );
-        
-        const barberRevenue = barberAppointments.reduce((sum, apt) => sum + apt.price, 0);
-        
-        if (is100Percent) {
-          totalRental += barberRevenue;
-        } else if (is50Percent) {
-          totalRental += barberRevenue * 0.5;
-        }
+        barbersWithChairRental.add(barberSlug);
       }
     });
     
-    return totalRental;
-  }, [collaborators, barbershopRevenue]);
+    return barbershopRevenue
+      .filter((apt) => !barbersWithChairRental.has(apt.barberId))
+      .reduce((sum, apt) => sum + apt.price, 0);
+  }, [barbershopRevenue, collaborators]);
+
+  const vipSubscriptionRevenue = useMemo(() => {
+    // Receita das assinaturas VIP pagas (mensais/anuais)
+    return vipData.members
+      .filter((member) => member.paymentStatus === "paid")
+      .reduce((sum, member) => {
+        const subscriptionPrice = member.billingCycle === "monthly" 
+          ? vipData.config.priceMonthly 
+          : vipData.config.priceAnnual / 12; // Anual dividido por 12 para mensal
+        return sum + subscriptionPrice;
+      }, 0);
+  }, [vipData]);
 
   const totalBarbershopRevenue = useMemo(() => {
-    return appointmentRevenue + chairRentalRevenue;
-  }, [appointmentRevenue, chairRentalRevenue]);
+    return revenueWithoutChairRental + chairRentalRevenue + vipSubscriptionRevenue;
+  }, [revenueWithoutChairRental, chairRentalRevenue, vipSubscriptionRevenue]);
 
   const totalShopRevenue = useMemo(() => {
     return shopRevenue.reduce((sum, sale) => sum + sale.total, 0);

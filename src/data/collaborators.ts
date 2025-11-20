@@ -16,6 +16,7 @@ export interface Collaborator {
   photoUrl?: string;
   experience?: string;
   workSchedule?: string;
+  chairRentalAmount?: number;
   createdAt: string;
 }
 

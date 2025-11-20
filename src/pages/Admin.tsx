@@ -560,16 +560,30 @@ const Admin = () => {
         return sum + subscriptionPrice;
       }, 0);
 
+    // Calcular receita de aluguel de cadeiras (mensal)
+    const chairRentalRevenue = collaborators.reduce((sum, collaborator) => {
+      const paymentMethod = collaborator.paymentMethod;
+      const isChairRental = paymentMethod === "aluguel-cadeira-100" || 
+                            paymentMethod === "aluguel-cadeira-50" ||
+                            paymentMethod === "recebe-100-por-cliente" ||
+                            paymentMethod === "recebe-50-por-cliente";
+      
+      if (isChairRental && collaborator.chairRentalAmount && collaborator.chairRentalAmount > 0) {
+        return sum + collaborator.chairRentalAmount;
+      }
+      return sum;
+    }, 0);
+
     const dailyTotal = dailyBookingRevenue + dailyShopRevenue;
     const weeklyTotal = weeklyBookingRevenue + weeklyShopRevenue;
-    const monthlyTotal = monthlyBookingRevenue + monthlyShopRevenue + vipSubscriptionRevenue;
+    const monthlyTotal = monthlyBookingRevenue + monthlyShopRevenue + vipSubscriptionRevenue + chairRentalRevenue;
 
     return [
       { title: "Faturamento Mensal", value: currencyFormatter.format(monthlyTotal) },
       { title: "Faturamento Semanal", value: currencyFormatter.format(weeklyTotal) },
       { title: "Faturamento Diário", value: currencyFormatter.format(dailyTotal) },
     ];
-  }, [allBookings, services, shopSales, vipData]);
+  }, [allBookings, services, shopSales, vipData, collaborators]);
 
   const baseStats: StatItem[] = useMemo(() => [
     { key: "bookings", title: "Agendamentos Hoje", value: "23", icon: Calendar, color: "text-primary" },

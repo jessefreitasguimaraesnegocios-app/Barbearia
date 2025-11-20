@@ -26,6 +26,7 @@ interface CollaboratorFormState {
   photoUrl: string;
   experience: string;
   workSchedule: string;
+  chairRentalAmount: string;
 }
 
 const INITIAL_FORM_STATE: CollaboratorFormState = {
@@ -40,6 +41,7 @@ const INITIAL_FORM_STATE: CollaboratorFormState = {
   photoUrl: "",
   experience: "",
   workSchedule: "",
+  chairRentalAmount: "",
 };
 
 const AdminCollaborators = () => {
@@ -113,6 +115,7 @@ const AdminCollaborators = () => {
         photoUrl: selectedCollaborator.photoUrl || "",
         experience: selectedCollaborator.experience || "",
         workSchedule: selectedCollaborator.workSchedule || "",
+        chairRentalAmount: selectedCollaborator.chairRentalAmount ? String(selectedCollaborator.chairRentalAmount) : "",
       });
     } else {
       setFormState(INITIAL_FORM_STATE);
@@ -143,6 +146,20 @@ const AdminCollaborators = () => {
         variant: "destructive",
         title: "Dados incompletos",
         description: "Preencha nome, e-mail e CPF do colaborador.",
+      });
+      return;
+    }
+
+    const isChairRental = formState.paymentMethod === "aluguel-cadeira-100" || 
+                          formState.paymentMethod === "aluguel-cadeira-50" ||
+                          formState.paymentMethod === "recebe-100-por-cliente" ||
+                          formState.paymentMethod === "recebe-50-por-cliente";
+
+    if (isChairRental && (!formState.chairRentalAmount || parseFloat(formState.chairRentalAmount) <= 0)) {
+      toast({
+        variant: "destructive",
+        title: "Valor de aluguel obrigatório",
+        description: "Informe o valor do aluguel de cadeira quando a forma de pagamento for relacionada a aluguel.",
       });
       return;
     }
@@ -202,6 +219,7 @@ const AdminCollaborators = () => {
                 photoUrl: formState.photoUrl.trim() || undefined,
                 experience: formState.experience.trim() || undefined,
                 workSchedule: formState.workSchedule.trim() || undefined,
+                chairRentalAmount: isChairRental && formState.chairRentalAmount ? parseFloat(formState.chairRentalAmount) : undefined,
               }
             : collaborator,
         ),
@@ -227,6 +245,7 @@ const AdminCollaborators = () => {
       photoUrl: formState.photoUrl.trim() || undefined,
       experience: formState.experience.trim() || undefined,
       workSchedule: formState.workSchedule.trim() || undefined,
+      chairRentalAmount: isChairRental && formState.chairRentalAmount ? parseFloat(formState.chairRentalAmount) : undefined,
       createdAt: new Date().toISOString(),
     };
 
@@ -576,6 +595,30 @@ const AdminCollaborators = () => {
                       </Select>
                     </div>
                   </div>
+
+                  {(formState.paymentMethod === "aluguel-cadeira-100" || 
+                    formState.paymentMethod === "aluguel-cadeira-50" ||
+                    formState.paymentMethod === "recebe-100-por-cliente" ||
+                    formState.paymentMethod === "recebe-50-por-cliente") && (
+                    <div className="space-y-2">
+                      <Label htmlFor="collaborator-chair-rental-amount">
+                        Alugar Cadeira <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        id="collaborator-chair-rental-amount"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formState.chairRentalAmount}
+                        onChange={(event) => handleInputChange("chairRentalAmount", event.target.value)}
+                        placeholder="0.00"
+                        required
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        Valor mensal do aluguel de cadeira que será cobrado do barbeiro
+                      </p>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">

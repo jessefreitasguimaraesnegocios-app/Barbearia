@@ -208,6 +208,7 @@ const AdminBarbershopRevenue = () => {
   const vipRevenues = useMemo(() => {
     const vipMap = new Map<string, VipRevenue>();
     
+    // Adicionar agendamentos VIP do mês
     const vipAppointments = getMonthAppointments.filter((apt) => apt.isVip);
     
     vipAppointments.forEach((apt) => {
@@ -228,8 +229,30 @@ const AdminBarbershopRevenue = () => {
       client.appointmentCount += 1;
     });
     
+    // Adicionar assinaturas VIP pagas (mesmo sem agendamentos no mês)
+    vipData.members
+      .filter((member) => member.paymentStatus === "paid")
+      .forEach((member) => {
+        const clientKey = member.name.toLowerCase().trim();
+        const subscriptionPrice = member.billingCycle === "monthly" 
+          ? vipData.config.priceMonthly 
+          : vipData.config.priceAnnual;
+        
+        if (!vipMap.has(clientKey)) {
+          vipMap.set(clientKey, {
+            clientName: member.name,
+            totalRevenue: 0,
+            appointments: [],
+            appointmentCount: 0,
+          });
+        }
+        
+        const client = vipMap.get(clientKey)!;
+        client.totalRevenue += subscriptionPrice;
+      });
+    
     return Array.from(vipMap.values()).sort((a, b) => b.totalRevenue - a.totalRevenue);
-  }, [getMonthAppointments]);
+  }, [getMonthAppointments, vipData]);
 
   const barbersWithChairRental = useMemo(() => {
     const barberIds = new Set<string>();
@@ -283,29 +306,19 @@ const AdminBarbershopRevenue = () => {
     
     collaborators.forEach((collaborator) => {
       const paymentMethod = collaborator.paymentMethod;
-      const is100Percent = paymentMethod === "aluguel-cadeira-100" || paymentMethod === "recebe-100-por-cliente";
-      const is50Percent = paymentMethod === "aluguel-cadeira-50" || paymentMethod === "recebe-50-por-cliente";
+      const isChairRental = paymentMethod === "aluguel-cadeira-100" || 
+                            paymentMethod === "aluguel-cadeira-50" ||
+                            paymentMethod === "recebe-100-por-cliente" ||
+                            paymentMethod === "recebe-50-por-cliente";
       
-      if (is100Percent || is50Percent) {
-        const barberId = collaborator.id;
-        const barberSlug = getBarberIdFromCollaborator(collaborator);
-        
-        const barberAppointments = getMonthAppointments.filter((apt) => 
-          apt.barberId === barberId || apt.barberId === barberSlug
-        );
-        
-        const barberRevenue = barberAppointments.reduce((sum, apt) => sum + apt.price, 0);
-        
-        if (is100Percent) {
-          totalRental += barberRevenue;
-        } else if (is50Percent) {
-          totalRental += barberRevenue * 0.5;
-        }
+      // Usar apenas o valor personalizado do campo "Alugar Cadeira"
+      if (isChairRental && collaborator.chairRentalAmount && collaborator.chairRentalAmount > 0) {
+        totalRental += collaborator.chairRentalAmount;
       }
     });
     
     return totalRental;
-  }, [getMonthAppointments, collaborators]);
+  }, [collaborators]);
 
   const totalRevenue = useMemo(() => {
     return totalNonVipRevenue + totalVipRevenue + chairRentalRevenue;
@@ -476,55 +489,77 @@ const AdminBarbershopRevenue = () => {
               <CardContent className="space-y-4">
                 {vipRevenues.length === 0 ? (
                   <p className="text-center text-muted-foreground py-4">
-                    Nenhum agendamento VIP registrado
+                    Nenhum cliente VIP registrado
                   </p>
                 ) : (
                   <>
-                    {vipRevenues.map((vip, index) => (
-                      <div key={`${vip.clientName}-${index}`} className="p-4 bg-secondary/50 rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2 flex-1">
-                            <User className="h-4 w-4 text-primary flex-shrink-0" />
-                            <span className="font-semibold">{vip.clientName}</span>
-                            <Badge variant="default" className="text-xs">
-                              VIP
-                            </Badge>
-                          </div>
-                          <span className="text-lg font-bold text-primary ml-2">
-                            {currencyFormatter.format(vip.totalRevenue)}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm text-muted-foreground mb-3">
-                          <span>{vip.appointmentCount} {vip.appointmentCount === 1 ? "agendamento" : "agendamentos"}</span>
-                          <span className="text-xs">
-                            Média: {currencyFormatter.format(vip.totalRevenue / vip.appointmentCount)}
-                          </span>
-                        </div>
-                        <div className="pt-3 border-t border-border space-y-2 max-h-48 overflow-y-auto">
-                          {vip.appointments.map((apt) => (
-                            <div key={apt.id} className="flex items-center justify-between text-xs">
-                              <div className="flex-1">
-                                <span className="font-medium">{apt.serviceName}</span>
-                                <span className="text-muted-foreground ml-2">
-                                  {format(parseISO(apt.date), "dd/MM")} às {apt.time}
-                                </span>
-                                <span className="text-muted-foreground ml-2">
-                                  • {apt.barberName}
-                                </span>
-                                {apt.discountPercentage && (
-                                  <Badge variant="outline" className="ml-2 text-xs">
-                                    -{apt.discountPercentage}%
-                                  </Badge>
-                                )}
-                              </div>
-                              <span className="font-semibold">
-                                {currencyFormatter.format(apt.price)}
-                              </span>
+                    {vipRevenues.map((vip, index) => {
+                      const hasAppointments = vip.appointments.length > 0;
+                      const appointmentsRevenue = vip.appointments.reduce((sum, apt) => sum + apt.price, 0);
+                      const hasSubscription = vip.totalRevenue > appointmentsRevenue;
+                      
+                      return (
+                        <div key={`${vip.clientName}-${index}`} className="p-4 bg-secondary/50 rounded-lg">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2 flex-1">
+                              <User className="h-4 w-4 text-primary flex-shrink-0" />
+                              <span className="font-semibold">{vip.clientName}</span>
+                              <Badge variant="default" className="text-xs">
+                                VIP
+                              </Badge>
                             </div>
-                          ))}
+                            <span className="text-lg font-bold text-primary ml-2">
+                              {currencyFormatter.format(vip.totalRevenue)}
+                            </span>
+                          </div>
+                          {hasAppointments && (
+                            <div className="flex items-center justify-between text-sm text-muted-foreground mb-3">
+                              <span>{vip.appointmentCount} {vip.appointmentCount === 1 ? "agendamento" : "agendamentos"}</span>
+                              {vip.appointmentCount > 0 && (
+                                <span className="text-xs">
+                                  Média: {currencyFormatter.format(vip.totalRevenue / vip.appointmentCount)}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          {hasAppointments && (
+                            <div className="pt-3 border-t border-border space-y-2 max-h-48 overflow-y-auto">
+                              {vip.appointments.map((apt) => (
+                                <div key={apt.id} className="flex items-center justify-between text-xs">
+                                  <div className="flex-1">
+                                    <span className="font-medium">{apt.serviceName}</span>
+                                    <span className="text-muted-foreground ml-2">
+                                      {format(parseISO(apt.date), "dd/MM")} às {apt.time}
+                                    </span>
+                                    <span className="text-muted-foreground ml-2">
+                                      • {apt.barberName}
+                                    </span>
+                                    {apt.discountPercentage && (
+                                      <Badge variant="outline" className="ml-2 text-xs">
+                                        -{apt.discountPercentage}%
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <span className="font-semibold">
+                                    {currencyFormatter.format(apt.price)}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {hasSubscription && (
+                            <div className="pt-3 border-t border-border">
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground">Assinatura VIP</span>
+                                <span className="font-semibold text-primary">
+                                  {currencyFormatter.format(vip.totalRevenue - appointmentsRevenue)}
+                                </span>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                     <div className="pt-4 border-t border-border">
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-lg">Total VIP</span>
