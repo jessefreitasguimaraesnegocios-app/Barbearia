@@ -120,13 +120,29 @@ const ConfirmBooking = () => {
 
   const handlePayment = () => {
     if (isPaymentFormValid() && areAllClientNamesFilled()) {
+      const storedBarbershop = localStorage.getItem("selectedBarbershop");
+      let barbershopId: string | null = null;
+      
+      if (storedBarbershop) {
+        try {
+          const parsed = JSON.parse(storedBarbershop) as { id?: string | number };
+          if (parsed.id) {
+            barbershopId = typeof parsed.id === "number" ? parsed.id.toString() : parsed.id;
+          }
+        } catch {
+          // Ignore parsing errors
+        }
+      }
+      
       const bookingData = {
         appointments: appointments.map((apt) => ({
           ...apt,
           date: apt.date.toISOString(),
+          clientName: apt.clientName || paymentData.fullName || undefined,
         })),
         payment: paymentData,
         timestamp: new Date().toISOString(),
+        barbershopId: barbershopId || undefined,
       };
       
       const bookingKey = `bookingConfirmation_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;

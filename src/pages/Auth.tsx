@@ -10,6 +10,10 @@ import { Switch } from "@/components/ui/switch";
 import { Eye, EyeOff } from "lucide-react";
 import { Collaborator } from "@/data/collaborators";
 import { loadCollaborators, persistCollaborators } from "@/lib/collaborators-storage";
+import { persistBarbershops } from "@/lib/barbershops-storage";
+import { persistServices } from "@/lib/services-storage";
+import { persistInventory } from "@/lib/inventory-storage";
+import { persistVipData } from "@/lib/vips-storage";
 import { verifyPassword } from "@/lib/password";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/components/ui/sonner";
@@ -225,9 +229,109 @@ const Auth = () => {
         createdAt: new Date().toISOString(),
       };
 
-      const next = [...collaborators, newCollaborator];
-      persistCollaborators(next);
-      setCollaborators(next);
+      // Limpar todos os dados padrão para novo usuário começar do zero
+      // Salvar apenas o novo colaborador (sem dados padrão)
+      persistCollaborators([newCollaborator]);
+      setCollaborators([newCollaborator]);
+
+      // Limpar e salvar arrays vazios para garantir dashboard limpo
+      // Barbearias: array vazio
+      persistBarbershops([]);
+
+      // Serviços: array vazio
+      persistServices([]);
+
+      // Estoque/Inventário: estrutura vazia
+      persistInventory(
+        {
+          storeProducts: [],
+          consumables: [],
+          storefront: {
+            title: "Nossa Loja",
+            subtitle: "Produtos profissionais selecionados para cuidar do seu estilo",
+            highlight: "Para compras acima de R$ 100,00 dentro da região metropolitana",
+          },
+        },
+        null
+      );
+
+      // Limpar todas as chaves de inventário de barbearias específicas
+      if (typeof window !== "undefined") {
+        const inventoryKeys: string[] = [];
+        for (let i = 0; i < window.localStorage.length; i++) {
+          const key = window.localStorage.key(i);
+          if (key && key.startsWith("barberbook_admin_inventory") && key !== "barberbook_admin_inventory_default") {
+            inventoryKeys.push(key);
+          }
+        }
+        inventoryKeys.forEach((key) => window.localStorage.removeItem(key));
+      }
+
+      // VIPs: estrutura vazia (apenas config padrão, sem membros)
+      persistVipData({
+        config: {
+          priceMonthly: 199.9,
+          priceAnnual: 500.0,
+          billingCycle: "monthly",
+          benefits: [],
+        },
+        members: [],
+      });
+
+      // Limpar seleção de barbearia padrão
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem("barberbook_default_barbershop");
+        window.localStorage.removeItem("selectedBarbershop");
+      }
+
+      // Limpar todos os agendamentos (bookingConfirmation_*)
+      if (typeof window !== "undefined") {
+        const bookingKeys: string[] = [];
+        for (let i = 0; i < window.localStorage.length; i++) {
+          const key = window.localStorage.key(i);
+          if (key && key.startsWith("bookingConfirmation")) {
+            bookingKeys.push(key);
+          }
+        }
+        bookingKeys.forEach((key) => window.localStorage.removeItem(key));
+        
+        // Limpar também agendamentos temporários
+        window.localStorage.removeItem("bookingAppointments");
+      }
+
+      // Limpar registros de ponto (time_clock_*)
+      if (typeof window !== "undefined") {
+        const timeClockKeys: string[] = [];
+        for (let i = 0; i < window.localStorage.length; i++) {
+          const key = window.localStorage.key(i);
+          if (key && key.startsWith("time_clock_")) {
+            timeClockKeys.push(key);
+          }
+        }
+        timeClockKeys.forEach((key) => window.localStorage.removeItem(key));
+      }
+
+      // Limpar vendas da loja (shop_sale_* e completed_order_*)
+      if (typeof window !== "undefined") {
+        const saleKeys: string[] = [];
+        for (let i = 0; i < window.localStorage.length; i++) {
+          const key = window.localStorage.key(i);
+          if (key && (key.startsWith("shop_sale_") || key.startsWith("completed_order_"))) {
+            saleKeys.push(key);
+          }
+        }
+        saleKeys.forEach((key) => window.localStorage.removeItem(key));
+      }
+
+      // Limpar despesas
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem("barberbook_admin_expenses");
+      }
+
+      // Limpar carrinho
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem("fadebook-cart");
+      }
 
       // limpa campos e informa sucesso
       setLoginEmail(email);

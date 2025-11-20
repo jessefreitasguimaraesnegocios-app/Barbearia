@@ -12,6 +12,13 @@ import {
 	AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Calendar,
   Users,
   DollarSign,
@@ -23,15 +30,22 @@ import {
   UserCircle,
   Scissors,
   ShoppingBag,
+  Copy,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useState, useEffect, useMemo, type MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import { useToast } from "@/components/ui/use-toast";
 import { loadServices } from "@/lib/services-storage";
 import { loadCollaborators } from "@/lib/collaborators-storage";
+import { loadBarbershops } from "@/lib/barbershops-storage";
+import { loadInventory } from "@/lib/inventory-storage";
+import { loadVipData } from "@/lib/vips-storage";
 import { DEFAULT_SERVICES, ServiceItem } from "@/data/services";
 import { Collaborator } from "@/data/collaborators";
-import { parseISO, isSameDay, startOfToday } from "date-fns";
+import { VipData } from "@/data/vips";
+import { InventoryData } from "@/data/inventory";
+import { parseISO, isSameDay, startOfToday, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, isAfter } from "date-fns";
 
 type StatItem = {
   key: string;
@@ -43,27 +57,11 @@ type StatItem = {
   onIconClick?: (event: MouseEvent<HTMLButtonElement>) => void;
 };
 
-const revenueViews = [
-  { title: "Faturamento Mensal", value: "R$ 28.450" },
-  { title: "Faturamento Semanal", value: "R$ 6.580" },
-  { title: "Faturamento Diário", value: "R$ 940" },
-];
+// revenueViews será calculado dinamicamente baseado nas vendas e agendamentos reais
 
-const bookingViews = [
-  { title: "Agendamentos Hoje", value: "23" },
-  { title: "Agendamentos Semanal", value: "142" },
-  { title: "Agendamentos Mensal", value: "587" },
-];
+// bookingViews será calculado dinamicamente baseado nos agendamentos reais
 
-const inventoryViews = [
-  { title: "Estoque da Loja", value: "45" },
-  { title: "Estoque da Barbearia", value: "42" },
-];
-
-const clientViews = [
-  { title: "Cliente Vip Ativo", value: "28" },
-  { title: "Cliente vip inativo", value: "12" },
-];
+// clientViews será calculado dinamicamente baseado nos clientes VIP reais
 
 interface AppointmentData {
   id: string;
@@ -82,10 +80,27 @@ interface BookingConfirmation {
     cpf: string;
   };
   timestamp: string;
+  barbershopId?: string;
+}
+
+interface SelectedAppointment {
+  apt: {
+    serviceName: string;
+    clientName: string;
+    date: Date;
+    time: string;
+    barber: string;
+  };
+  payment: {
+    fullName: string;
+    phone: string;
+    cpf: string;
+  };
 }
 
 const Admin = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [revenueViewIndex, setRevenueViewIndex] = useState(0);
   const [isRevenueHidden, setIsRevenueHidden] = useState(false);
   const [bookingViewIndex, setBookingViewIndex] = useState(0);
@@ -94,13 +109,27 @@ const Admin = () => {
   const [allBookings, setAllBookings] = useState<BookingConfirmation[]>([]);
   const [services, setServices] = useState<ServiceItem[]>(DEFAULT_SERVICES);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const [selectedAppointment, setSelectedAppointment] = useState<SelectedAppointment | null>(null);
+  const [vipData, setVipData] = useState<VipData>(loadVipData());
+  const [shopSales, setShopSales] = useState<Array<{ total: number; timestamp: string }>>([]);
+  const [inventory, setInventory] = useState<InventoryData>(() => {
+    const barbershops = loadBarbershops();
+    const storedActiveId = localStorage.getItem("admin_active_barbershop_id");
+    const storedMatch = storedActiveId ? barbershops.find((shop) => shop.id === storedActiveId) : null;
+    const fallbackBarbershop = barbershops[0] ?? null;
+    const targetBarbershop = storedMatch ?? fallbackBarbershop;
+    const resolvedBarbershopId = targetBarbershop?.id ?? null;
+    return loadInventory(resolvedBarbershopId);
+  });
+  const [activeBarbershop, setActiveBarbershop] = useState<{ id: string; name: string } | null>(() => {
+    const barbershops = loadBarbershops();
+    const storedActiveId = localStorage.getItem("admin_active_barbershop_id");
+    const storedMatch = storedActiveId ? barbershops.find((shop) => shop.id === storedActiveId) : null;
+    const fallbackBarbershop = barbershops[0] ?? null;
+    const targetBarbershop = storedMatch ?? fallbackBarbershop;
+    return targetBarbershop ? { id: targetBarbershop.id, name: targetBarbershop.name || "Barbearia" } : null;
+  });
 
-  const baseStats: StatItem[] = [
-    { key: "bookings", title: "Agendamentos Hoje", value: "23", icon: Calendar, color: "text-primary" },
-    { key: "clients", title: clientViews[0].title, value: clientViews[0].value, icon: Users, color: "text-blue-500" },
-    { key: "revenue", title: revenueViews[0].title, value: revenueViews[0].value, icon: DollarSign, color: "text-green-500" },
-    { key: "inventory", title: inventoryViews[0].title, value: inventoryViews[0].value, icon: Package, color: "text-orange-500" },
-  ];
 
   const handleRevenueCardClick = () => {
     setRevenueViewIndex((prev) => (prev + 1) % revenueViews.length);
@@ -124,6 +153,13 @@ const Admin = () => {
   };
 
   const loadBookings = () => {
+    const barbershops = loadBarbershops();
+    const storedActiveId = localStorage.getItem("admin_active_barbershop_id");
+    const storedMatch = storedActiveId ? barbershops.find((shop) => shop.id === storedActiveId) : null;
+    const fallbackBarbershop = barbershops[0] ?? null;
+    const targetBarbershop = storedMatch ?? fallbackBarbershop;
+    const resolvedBarbershopId = targetBarbershop?.id ?? null;
+    
     const updatedBookings: BookingConfirmation[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
@@ -134,9 +170,24 @@ const Admin = () => {
             const parsed = JSON.parse(value);
             if (parsed && parsed.appointments) {
               if (Array.isArray(parsed)) {
-                updatedBookings.push(...parsed.filter((b: BookingConfirmation) => b && b.appointments));
+                const filtered = parsed.filter((b: BookingConfirmation) => {
+                  if (!b || !b.appointments) return false;
+                  if (resolvedBarbershopId) {
+                    return b.barbershopId === resolvedBarbershopId;
+                  }
+                  return !b.barbershopId;
+                });
+                updatedBookings.push(...filtered);
               } else {
-                updatedBookings.push(parsed);
+                if (resolvedBarbershopId) {
+                  if (parsed.barbershopId === resolvedBarbershopId) {
+                    updatedBookings.push(parsed);
+                  }
+                } else {
+                  if (!parsed.barbershopId) {
+                    updatedBookings.push(parsed);
+                  }
+                }
               }
             }
           }
@@ -148,6 +199,47 @@ const Admin = () => {
     setAllBookings(updatedBookings);
   };
 
+  const loadShopSales = () => {
+    const allSales: Array<{ total: number; timestamp: string }> = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith("shop_sale_") || key.startsWith("completed_order_"))) {
+        try {
+          const value = localStorage.getItem(key);
+          if (value) {
+            const parsed = JSON.parse(value);
+            if (parsed && Array.isArray(parsed)) {
+              parsed.forEach((sale: any) => {
+                if (sale.total || (sale.price && sale.quantity)) {
+                  allSales.push({
+                    total: sale.total ?? (sale.price * sale.quantity),
+                    timestamp: sale.timestamp || sale.date || new Date().toISOString(),
+                  });
+                }
+              });
+            } else if (parsed && parsed.items) {
+              parsed.items.forEach((item: any) => {
+                const itemTotal = (item.priceValue || item.price || 0) * (item.quantity || 1);
+                allSales.push({
+                  total: itemTotal,
+                  timestamp: parsed.timestamp || parsed.date || new Date().toISOString(),
+                });
+              });
+            } else if (parsed && parsed.total) {
+              allSales.push({
+                total: parsed.total,
+                timestamp: parsed.timestamp || parsed.date || new Date().toISOString(),
+              });
+            }
+          }
+        } catch {
+          continue;
+        }
+      }
+    }
+    setShopSales(allSales);
+  };
+
   useEffect(() => {
     const nextServices = loadServices();
     setServices(nextServices);
@@ -155,11 +247,65 @@ const Admin = () => {
     const loadedCollaborators = loadCollaborators();
     setCollaborators(loadedCollaborators);
     
+    const nextVipData = loadVipData();
+    setVipData(nextVipData);
+    
+    const barbershops = loadBarbershops();
+    const storedActiveId = localStorage.getItem("admin_active_barbershop_id");
+    const storedMatch = storedActiveId ? barbershops.find((shop) => shop.id === storedActiveId) : null;
+    const fallbackBarbershop = barbershops[0] ?? null;
+    const targetBarbershop = storedMatch ?? fallbackBarbershop;
+    const resolvedBarbershopId = targetBarbershop?.id ?? null;
+    const nextInventory = loadInventory(resolvedBarbershopId);
+    setInventory(nextInventory);
+    
+    if (targetBarbershop) {
+      setActiveBarbershop({ id: targetBarbershop.id, name: targetBarbershop.name || "Barbearia" });
+    } else {
+      setActiveBarbershop(null);
+    }
+    
     loadBookings();
+    loadShopSales();
 
     const handleStorage = (event: StorageEvent) => {
       if (event.key?.startsWith("bookingConfirmation")) {
         loadBookings();
+      }
+      if (event.key === "barberbook_admin_vips") {
+        const nextVipData = loadVipData();
+        setVipData(nextVipData);
+      }
+      if (event.key === "barberbook_admin_barbershops") {
+        const barbershops = loadBarbershops();
+        const storedActiveId = localStorage.getItem("admin_active_barbershop_id");
+        const storedMatch = storedActiveId ? barbershops.find((shop) => shop.id === storedActiveId) : null;
+        const fallbackBarbershop = barbershops[0] ?? null;
+        const targetBarbershop = storedMatch ?? fallbackBarbershop;
+        if (targetBarbershop) {
+          setActiveBarbershop({ id: targetBarbershop.id, name: targetBarbershop.name || "Barbearia" });
+        } else {
+          setActiveBarbershop(null);
+        }
+      }
+      if (event.key === "admin_active_barbershop_id" || event.key?.startsWith("barberbook_admin_inventory")) {
+        const barbershops = loadBarbershops();
+        const storedActiveId = localStorage.getItem("admin_active_barbershop_id");
+        const storedMatch = storedActiveId ? barbershops.find((shop) => shop.id === storedActiveId) : null;
+        const fallbackBarbershop = barbershops[0] ?? null;
+        const targetBarbershop = storedMatch ?? fallbackBarbershop;
+        const resolvedBarbershopId = targetBarbershop?.id ?? null;
+        const nextInventory = loadInventory(resolvedBarbershopId);
+        setInventory(nextInventory);
+        if (targetBarbershop) {
+          setActiveBarbershop({ id: targetBarbershop.id, name: targetBarbershop.name || "Barbearia" });
+        } else {
+          setActiveBarbershop(null);
+        }
+      }
+      // Atualizar quando houver mudanças em vendas da loja
+      if (event.key?.startsWith("shop_sale_") || event.key?.startsWith("completed_order_")) {
+        loadShopSales();
       }
     };
 
@@ -170,6 +316,41 @@ const Admin = () => {
       originalSetItem.apply(this, args);
       if (args[0]?.startsWith("bookingConfirmation")) {
         loadBookings();
+      }
+      if (args[0] === "barberbook_admin_vips") {
+        const nextVipData = loadVipData();
+        setVipData(nextVipData);
+      }
+      if (args[0] === "barberbook_admin_barbershops") {
+        const barbershops = loadBarbershops();
+        const storedActiveId = localStorage.getItem("admin_active_barbershop_id");
+        const storedMatch = storedActiveId ? barbershops.find((shop) => shop.id === storedActiveId) : null;
+        const fallbackBarbershop = barbershops[0] ?? null;
+        const targetBarbershop = storedMatch ?? fallbackBarbershop;
+        if (targetBarbershop) {
+          setActiveBarbershop({ id: targetBarbershop.id, name: targetBarbershop.name || "Barbearia" });
+        } else {
+          setActiveBarbershop(null);
+        }
+      }
+      if (args[0] === "admin_active_barbershop_id" || args[0]?.startsWith("barberbook_admin_inventory")) {
+        const barbershops = loadBarbershops();
+        const storedActiveId = localStorage.getItem("admin_active_barbershop_id");
+        const storedMatch = storedActiveId ? barbershops.find((shop) => shop.id === storedActiveId) : null;
+        const fallbackBarbershop = barbershops[0] ?? null;
+        const targetBarbershop = storedMatch ?? fallbackBarbershop;
+        const resolvedBarbershopId = targetBarbershop?.id ?? null;
+        const nextInventory = loadInventory(resolvedBarbershopId);
+        setInventory(nextInventory);
+        if (targetBarbershop) {
+          setActiveBarbershop({ id: targetBarbershop.id, name: targetBarbershop.name || "Barbearia" });
+        } else {
+          setActiveBarbershop(null);
+        }
+      }
+      // Atualizar quando houver mudanças em vendas da loja
+      if (args[0]?.startsWith("shop_sale_") || args[0]?.startsWith("completed_order_")) {
+        loadShopSales();
       }
     };
 
@@ -197,42 +378,207 @@ const Admin = () => {
     return collaboratorBySlug?.name || barberId;
   };
 
-  const todayAppointments = useMemo(() => {
+  // Calcular estatísticas de agendamentos
+  const bookingStats = useMemo(() => {
     const today = startOfToday();
-    const appointments: Array<{
+    const weekStart = startOfWeek(today, { weekStartsOn: 1 });
+    const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
+    const monthStart = startOfMonth(today);
+    const monthEnd = endOfMonth(today);
+
+    let todayCount = 0;
+    let weekCount = 0;
+    let monthCount = 0;
+    const todayAppointmentsList: Array<{
       client: string;
       service: string;
       time: string;
       barber: string;
       date: Date;
+      appointmentId: string;
+      booking: BookingConfirmation;
     }> = [];
 
     allBookings.forEach((booking) => {
       booking.appointments.forEach((apt) => {
         const aptDate = parseISO(apt.date);
+        
         if (isSameDay(aptDate, today)) {
+          todayCount++;
           const service = services.find((s) => s.id === apt.serviceId);
           const barberName = getBarberName(apt.barberId);
-          appointments.push({
+          todayAppointmentsList.push({
             client: apt.clientName || booking.payment.fullName,
             service: service?.title || "Serviço",
             time: apt.time,
             barber: barberName,
             date: aptDate,
+            appointmentId: apt.id,
+            booking: booking,
           });
+        }
+        
+        if (isWithinInterval(aptDate, { start: weekStart, end: weekEnd })) {
+          weekCount++;
+        }
+        
+        if (isWithinInterval(aptDate, { start: monthStart, end: monthEnd })) {
+          monthCount++;
         }
       });
     });
 
-    appointments.sort((a, b) => {
+    todayAppointmentsList.sort((a, b) => {
       if (a.time.localeCompare(b.time) !== 0) {
         return a.time.localeCompare(b.time);
       }
       return a.date.getTime() - b.date.getTime();
     });
 
-    return appointments.slice(0, 4);
+    return {
+      today: todayCount,
+      week: weekCount,
+      month: monthCount,
+      todayList: todayAppointmentsList.slice(0, 4),
+    };
   }, [allBookings, services, collaborators]);
+
+  const bookingViews = useMemo(() => [
+    { title: "Agendamentos Hoje", value: String(bookingStats.today) },
+    { title: "Agendamentos Semanal", value: String(bookingStats.week) },
+    { title: "Agendamentos Mensal", value: String(bookingStats.month) },
+  ], [bookingStats]);
+
+  const inventoryViews = useMemo(() => {
+    const storeProductsCount = inventory.storeProducts.filter(
+      (product) => product.category && product.category !== "rascunho"
+    ).length;
+    const consumablesCount = inventory.consumables.length;
+    
+    return [
+      { title: "Estoque da Loja", value: String(storeProductsCount) },
+      { title: "Estoque da Barbearia", value: String(consumablesCount) },
+    ];
+  }, [inventory]);
+
+  const clientViews = useMemo(() => {
+    const now = new Date();
+    let activeCount = 0;
+    let inactiveCount = 0;
+
+    vipData.members.forEach((member) => {
+      const expiresAt = parseISO(member.expiresAt);
+      const isActive = member.paymentStatus === "paid" && isAfter(expiresAt, now);
+      
+      if (isActive) {
+        activeCount++;
+      } else {
+        inactiveCount++;
+      }
+    });
+
+    return [
+      { title: "Cliente Vip Ativo", value: String(activeCount) },
+      { title: "Cliente vip inativo", value: String(inactiveCount) },
+    ];
+  }, [vipData]);
+
+  const revenueViews = useMemo(() => {
+    const currencyFormatter = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+    const today = startOfToday();
+    const weekStart = startOfWeek(today, { weekStartsOn: 1 });
+    const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
+    const monthStart = startOfMonth(today);
+    const monthEnd = endOfMonth(today);
+
+    // Calcular receita de agendamentos
+    let dailyBookingRevenue = 0;
+    let weeklyBookingRevenue = 0;
+    let monthlyBookingRevenue = 0;
+
+    allBookings.forEach((booking) => {
+      booking.appointments.forEach((apt) => {
+        const aptDate = parseISO(apt.date);
+        const service = services.find((s) => s.id === apt.serviceId);
+        
+        if (service) {
+          const hasDiscount =
+            service.promotionScope !== "none" &&
+            service.discountPercentage !== null &&
+            service.discountPercentage > 0;
+          
+          let price = service.price;
+          if (hasDiscount) {
+            if (service.promotionScope === "vip") {
+              // Para VIP, aplicar desconto apenas na primeira vez
+              price = service.price * (1 - (service.discountPercentage / 100));
+            } else {
+              price = service.price * (1 - (service.discountPercentage / 100));
+            }
+          }
+
+          if (isSameDay(aptDate, today)) {
+            dailyBookingRevenue += price;
+          }
+          if (isWithinInterval(aptDate, { start: weekStart, end: weekEnd })) {
+            weeklyBookingRevenue += price;
+          }
+          if (isWithinInterval(aptDate, { start: monthStart, end: monthEnd })) {
+            monthlyBookingRevenue += price;
+          }
+        }
+      });
+    });
+
+    // Calcular receita de vendas da loja
+    let dailyShopRevenue = 0;
+    let weeklyShopRevenue = 0;
+    let monthlyShopRevenue = 0;
+
+    shopSales.forEach((sale) => {
+      const saleDate = parseISO(sale.timestamp);
+      const total = sale.total || 0;
+
+      if (isSameDay(saleDate, today)) {
+        dailyShopRevenue += total;
+      }
+      if (isWithinInterval(saleDate, { start: weekStart, end: weekEnd })) {
+        weeklyShopRevenue += total;
+      }
+      if (isWithinInterval(saleDate, { start: monthStart, end: monthEnd })) {
+        monthlyShopRevenue += total;
+      }
+    });
+
+    // Calcular receita de assinaturas VIP pagas (mensal)
+    const vipSubscriptionRevenue = vipData.members
+      .filter((member) => member.paymentStatus === "paid")
+      .reduce((sum, member) => {
+        const subscriptionPrice = member.billingCycle === "monthly" 
+          ? vipData.config.priceMonthly 
+          : vipData.config.priceAnnual / 12; // Anual dividido por 12 para mensal
+        return sum + subscriptionPrice;
+      }, 0);
+
+    const dailyTotal = dailyBookingRevenue + dailyShopRevenue;
+    const weeklyTotal = weeklyBookingRevenue + weeklyShopRevenue;
+    const monthlyTotal = monthlyBookingRevenue + monthlyShopRevenue + vipSubscriptionRevenue;
+
+    return [
+      { title: "Faturamento Mensal", value: currencyFormatter.format(monthlyTotal) },
+      { title: "Faturamento Semanal", value: currencyFormatter.format(weeklyTotal) },
+      { title: "Faturamento Diário", value: currencyFormatter.format(dailyTotal) },
+    ];
+  }, [allBookings, services, shopSales, vipData]);
+
+  const baseStats: StatItem[] = useMemo(() => [
+    { key: "bookings", title: "Agendamentos Hoje", value: "23", icon: Calendar, color: "text-primary" },
+    { key: "clients", title: clientViews[0].title, value: clientViews[0].value, icon: Users, color: "text-blue-500" },
+    { key: "revenue", title: revenueViews[0].title, value: revenueViews[0].value, icon: DollarSign, color: "text-green-500" },
+    { key: "inventory", title: inventoryViews[0].title, value: inventoryViews[0].value, icon: Package, color: "text-orange-500" },
+  ], [clientViews, inventoryViews, revenueViews]);
+
+  const todayAppointments = bookingStats.todayList;
 
   const stats = baseStats.map((stat) => {
     if (stat.key === "revenue") {
@@ -283,6 +629,67 @@ const Admin = () => {
     return stat;
   });
 
+  const copyToClipboard = (text: string) => {
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(() => {
+        toast({
+          title: "Copiado",
+          description: "Texto copiado para a área de transferência",
+        });
+      }).catch(() => {
+        copyWithFallback(text);
+      });
+      return;
+    }
+
+    copyWithFallback(text);
+
+    function copyWithFallback(textToCopy: string) {
+      const textArea = document.createElement("textarea");
+      textArea.value = textToCopy;
+      textArea.style.position = "fixed";
+      textArea.style.opacity = "0";
+      textArea.style.left = "0";
+      textArea.style.top = "0";
+      textArea.style.width = "2em";
+      textArea.style.height = "2em";
+      textArea.style.padding = "0";
+      textArea.style.border = "none";
+      textArea.style.outline = "none";
+      textArea.style.boxShadow = "none";
+      textArea.style.background = "transparent";
+      textArea.setAttribute("readonly", "");
+      
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      textArea.setSelectionRange(0, 999999);
+      
+      try {
+        const successful = document.execCommand("copy");
+        document.body.removeChild(textArea);
+        
+        if (successful) {
+          toast({
+            title: "Copiado",
+            description: "Texto copiado para a área de transferência",
+          });
+        } else {
+          throw new Error("Copy command returned false");
+        }
+      } catch (err) {
+        if (document.body.contains(textArea)) {
+          document.body.removeChild(textArea);
+        }
+        toast({
+          title: "Erro",
+          description: "Não foi possível copiar o texto. Tente selecionar e copiar manualmente.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
   const logout = () => {
     try {
       localStorage.removeItem("adminAuth");
@@ -319,7 +726,18 @@ const Admin = () => {
                 </AlertDialogContent>
               </AlertDialog>
             </div>
-            <p className="text-muted-foreground">Visão geral da sua barbearia</p>
+            <div className="flex items-center gap-3 flex-wrap">
+              <p className="text-lg text-muted-foreground">
+                Visão geral da
+              </p>
+              {activeBarbershop?.name ? (
+                <span className="inline-flex items-center px-4 py-1.5 rounded-lg text-2xl md:text-3xl font-display font-bold bg-gradient-to-r from-primary/10 via-primary/15 to-primary/10 text-primary border border-primary/20 shadow-gold/30 hover:shadow-gold/50 transition-all duration-300 hover:scale-105">
+                  {activeBarbershop.name}
+                </span>
+              ) : (
+                <span className="text-lg text-muted-foreground">sua barbearia</span>
+              )}
+            </div>
           </div>
 
           {/* Stats Grid */}
@@ -370,7 +788,22 @@ const Admin = () => {
                     </p>
                   ) : (
                     todayAppointments.map((booking, index) => (
-                    <div key={index} className="flex items-center justify-between p-4 bg-secondary rounded-lg">
+                    <div 
+                      key={index} 
+                      className="flex items-center justify-between p-4 bg-secondary rounded-lg cursor-pointer hover:bg-secondary/80 transition-colors"
+                      onClick={() => {
+                        setSelectedAppointment({
+                          apt: {
+                            serviceName: booking.service,
+                            clientName: booking.client,
+                            date: booking.date,
+                            time: booking.time,
+                            barber: booking.barber,
+                          },
+                          payment: booking.booking.payment,
+                        });
+                      }}
+                    >
                       <div>
                         <div className="font-semibold">{booking.client}</div>
                         <div className="text-sm text-muted-foreground">{booking.service}</div>
@@ -466,6 +899,66 @@ const Admin = () => {
           </div>
         </div>
       </main>
+
+      <Dialog open={!!selectedAppointment} onOpenChange={(open) => !open && setSelectedAppointment(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Informações do Cliente</DialogTitle>
+            <DialogDescription>
+              Dados do cliente para o agendamento de {selectedAppointment?.apt.serviceName}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedAppointment && (
+            <div className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">Nome Completo</label>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-base font-semibold flex-1">{selectedAppointment.payment.fullName}</p>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => copyToClipboard(selectedAppointment.payment.fullName)}
+                    aria-label="Copiar nome completo"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">Número de Telefone</label>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-base font-semibold flex-1">{selectedAppointment.payment.phone}</p>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => copyToClipboard(selectedAppointment.payment.phone)}
+                    aria-label="Copiar telefone"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">CPF</label>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-base font-semibold flex-1">{selectedAppointment.payment.cpf}</p>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => copyToClipboard(selectedAppointment.payment.cpf)}
+                    aria-label="Copiar CPF"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

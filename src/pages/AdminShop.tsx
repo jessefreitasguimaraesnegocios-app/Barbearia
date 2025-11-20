@@ -59,6 +59,7 @@ const AdminShop = () => {
   const [previewCategory, setPreviewCategory] = useState<CategoryFilter>("produtos");
   const [activeBarbershopId, setActiveBarbershopId] = useState<string | null>(null);
   const initializedRef = useRef(false);
+  const isInternalUpdateRef = useRef(false);
 
   const currencyFormatter = useMemo(
     () => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }),
@@ -66,10 +67,8 @@ const AdminShop = () => {
   );
 
   useEffect(() => {
-    let isInternalUpdate = false;
-    
     const loadData = () => {
-      if (isInternalUpdate) {
+      if (isInternalUpdateRef.current) {
         return;
       }
       
@@ -117,7 +116,7 @@ const AdminShop = () => {
     window.addEventListener("storage", handleStorageChange);
     
     const handleLocalStorageChange = () => {
-      if (!isInternalUpdate) {
+      if (!isInternalUpdateRef.current) {
         loadData();
       }
     };
@@ -126,17 +125,19 @@ const AdminShop = () => {
     localStorage.setItem = function(...args) {
       const isInventoryKey = args[0] === "admin_active_barbershop_id" || args[0]?.startsWith("barberbook_admin_inventory");
       
-      if (isInventoryKey && !args[0]?.includes("_default") && initializedRef.current) {
-        isInternalUpdate = true;
+      // Se for uma chave de inventário e já estiver inicializado, marcar como atualização interna
+      if (isInventoryKey && initializedRef.current) {
+        isInternalUpdateRef.current = true;
         originalSetItem.apply(this, args);
         setTimeout(() => {
-          isInternalUpdate = false;
-        }, 100);
+          isInternalUpdateRef.current = false;
+        }, 200);
       } else {
         originalSetItem.apply(this, args);
       }
       
-      if (isInventoryKey && !isInternalUpdate) {
+      // Só recarregar se não for uma atualização interna
+      if (isInventoryKey && !isInternalUpdateRef.current) {
         handleLocalStorageChange();
       }
     };
@@ -334,10 +335,22 @@ const AdminShop = () => {
         setActiveProductId(sanitizedProduct.id);
       }
 
-      return {
+      const updatedInventory = {
         ...previous,
         storeProducts,
       };
+
+      // Persistir imediatamente ao adicionar/atualizar produto
+      if (initializedRef.current) {
+        const storedActiveId = localStorage.getItem("admin_active_barbershop_id");
+        const barbershopId = storedActiveId || activeBarbershopId;
+        // Usar setTimeout para garantir que o estado seja atualizado primeiro
+        setTimeout(() => {
+          persistInventory(updatedInventory, barbershopId);
+        }, 0);
+      }
+
+      return updatedInventory;
     });
 
     if (sanitizedProduct.category === "rascunho") {
@@ -365,10 +378,22 @@ const AdminShop = () => {
         setActiveProductId(filtered[0].id);
       }
 
-      return {
+      const updatedInventory = {
         ...previous,
         storeProducts: filtered,
       };
+
+      // Persistir imediatamente ao remover produto
+      if (initializedRef.current) {
+        const storedActiveId = localStorage.getItem("admin_active_barbershop_id");
+        const barbershopId = storedActiveId || activeBarbershopId;
+        // Usar setTimeout para garantir que o estado seja atualizado primeiro
+        setTimeout(() => {
+          persistInventory(updatedInventory, barbershopId);
+        }, 0);
+      }
+
+      return updatedInventory;
     });
 
     toast({
@@ -753,12 +778,36 @@ const AdminShop = () => {
 
           <div className="space-y-2">
             <Label htmlFor="product-vip-label">Texto promocional (opcional)</Label>
-            <Input
-              id="product-vip-label"
-              value={productForm.vipPromotionLabel}
-              onChange={(event) => handleProductFormChange("vipPromotionLabel", event.target.value)}
-              placeholder="VIP: 15% OFF e brinde exclusivo"
-            />
+            <div className="flex gap-2">
+              <Select
+                value=""
+                onValueChange={(value) => {
+                  const discount = parseInt(value);
+                  handleProductFormChange("vipPromotionLabel", `VIP: ${discount}% OFF`);
+                }}
+              >
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Desconto" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 18 }, (_, i) => {
+                    const discount = (i + 1) * 5;
+                    return (
+                      <SelectItem key={discount} value={String(discount)}>
+                        {discount}% OFF
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+              <Input
+                id="product-vip-label"
+                value={productForm.vipPromotionLabel}
+                onChange={(event) => handleProductFormChange("vipPromotionLabel", event.target.value)}
+                placeholder="VIP: 15% OFF e brinde exclusivo"
+                className="flex-1"
+              />
+            </div>
           </div>
 
           <div className="rounded-lg border border-border bg-secondary/40 px-4 py-3 text-sm text-muted-foreground">

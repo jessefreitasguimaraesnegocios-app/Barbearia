@@ -98,10 +98,8 @@ export const loadBarbershops = (): Barbershop[] => {
       .map(checkPaymentStatus)
       .filter((bs): bs is Barbershop => bs !== null);
 
-    if (!validBarbershops.length) {
-      return DEFAULT_BARBERSHOPS;
-    }
-
+    // Se a chave existe no localStorage, retornar o que está salvo (mesmo que vazio)
+    // Isso permite que novos usuários comecem com dados vazios
     persistBarbershops(validBarbershops);
     return validBarbershops;
   } catch {

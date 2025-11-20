@@ -137,6 +137,16 @@ const sanitizeInventory = (inventory: InventoryData): InventoryData => ({
   },
 });
 
+export const getEmptyInventory = (): InventoryData => ({
+  storeProducts: [],
+  consumables: [],
+  storefront: {
+    title: DEFAULT_INVENTORY.storefront.title,
+    subtitle: DEFAULT_INVENTORY.storefront.subtitle,
+    highlight: DEFAULT_INVENTORY.storefront.highlight,
+  },
+});
+
 export const loadInventory = (barbershopId: string | null = null): InventoryData => {
   if (typeof window === "undefined") {
     return DEFAULT_INVENTORY;

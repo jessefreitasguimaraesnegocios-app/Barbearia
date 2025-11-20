@@ -55,10 +55,8 @@ export const loadServices = (): ServiceItem[] => {
           : null,
     }));
 
-    if (!sanitized.length) {
-      return DEFAULT_SERVICES;
-    }
-
+    // Se a chave existe no localStorage, retornar o que está salvo (mesmo que vazio)
+    // Isso permite que novos usuários comecem com dados vazios
     return sanitized;
   } catch {
     return DEFAULT_SERVICES;

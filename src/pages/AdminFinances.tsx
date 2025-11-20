@@ -30,6 +30,7 @@ interface BookingConfirmation {
     cpf: string;
   };
   timestamp: string;
+  barbershopId?: string;
 }
 
 interface ShopSale {

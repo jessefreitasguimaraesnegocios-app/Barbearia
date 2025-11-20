@@ -146,7 +146,7 @@ const Shop = () => {
   }, []);
 
   const displayProducts = useMemo(() => {
-    const allProducts = !products.length ? DEFAULT_INVENTORY.storeProducts : products;
+    const allProducts = products;
     return allProducts.filter(
       (product) => product.category === selectedCategory && product.category && product.category !== "rascunho"
     );

@@ -60,10 +60,8 @@ export const loadCollaborators = (): Collaborator[] => {
 
     const validCollaborators = parsed.filter(isValidCollaborator).map(sanitizeCollaborator);
 
-    if (!validCollaborators.length) {
-      return DEFAULT_COLLABORATORS;
-    }
-
+    // Se a chave existe no localStorage, retornar o que está salvo (mesmo que vazio)
+    // Isso permite que novos usuários comecem com dados vazios
     return validCollaborators;
   } catch {
     return DEFAULT_COLLABORATORS;

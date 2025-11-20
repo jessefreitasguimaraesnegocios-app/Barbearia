@@ -7,8 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Scissors, TrendingUp, User, DollarSign } from "lucide-react";
 import { loadServices } from "@/lib/services-storage";
 import { loadCollaborators } from "@/lib/collaborators-storage";
+import { loadVipData } from "@/lib/vips-storage";
 import { DEFAULT_SERVICES, ServiceItem } from "@/data/services";
 import { Collaborator, PaymentMethod } from "@/data/collaborators";
+import { VipData } from "@/data/vips";
 import { format, startOfMonth, endOfMonth, parseISO, isWithinInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -29,6 +31,7 @@ interface BookingConfirmation {
     cpf: string;
   };
   timestamp: string;
+  barbershopId?: string;
 }
 
 interface AppointmentRevenue {
@@ -65,6 +68,7 @@ const AdminBarbershopRevenue = () => {
   const [services, setServices] = useState<ServiceItem[]>(DEFAULT_SERVICES);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [allBookings, setAllBookings] = useState<BookingConfirmation[]>([]);
+  const [vipData, setVipData] = useState<VipData>(loadVipData());
   const currentMonth = new Date();
 
   useEffect(() => {
@@ -73,6 +77,9 @@ const AdminBarbershopRevenue = () => {
     
     const loadedCollaborators = loadCollaborators();
     setCollaborators(loadedCollaborators);
+    
+    const nextVipData = loadVipData();
+    setVipData(nextVipData);
     
     const allStoredBookings: BookingConfirmation[] = [];
     for (let i = 0; i < localStorage.length; i++) {
@@ -96,6 +103,28 @@ const AdminBarbershopRevenue = () => {
       }
     }
     setAllBookings(allStoredBookings);
+
+    const handleStorageChange = (event?: StorageEvent) => {
+      if (!event || event.key === "barberbook_admin_vips") {
+        const nextVipData = loadVipData();
+        setVipData(nextVipData);
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+
+    const originalSetItem = localStorage.setItem;
+    localStorage.setItem = function(...args) {
+      originalSetItem.apply(this, args);
+      if (args[0] === "barberbook_admin_vips") {
+        handleStorageChange();
+      }
+    };
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      localStorage.setItem = originalSetItem;
+    };
   }, []);
 
   const getBarberIdFromCollaborator = (collaborator: Collaborator): string => {
@@ -224,6 +253,7 @@ const AdminBarbershopRevenue = () => {
   }, [getMonthAppointments, barbersWithChairRental]);
 
   const totalVipRevenue = useMemo(() => {
+    // Receita dos serviços VIP (com desconto)
     const vipFromNonRenters = getMonthAppointments
       .filter((apt) => apt.isVip && !barbersWithChairRental.has(apt.barberId))
       .reduce((sum, apt) => sum + apt.price, 0);
@@ -235,8 +265,18 @@ const AdminBarbershopRevenue = () => {
       return sum + clientVipRevenue;
     }, 0);
     
-    return vipFromNonRenters + vipFromRenters;
-  }, [vipRevenues, getMonthAppointments, barbersWithChairRental]);
+    // Receita das assinaturas VIP pagas (mensais/anuais)
+    const vipSubscriptionRevenue = vipData.members
+      .filter((member) => member.paymentStatus === "paid")
+      .reduce((sum, member) => {
+        const subscriptionPrice = member.billingCycle === "monthly" 
+          ? vipData.config.priceMonthly 
+          : vipData.config.priceAnnual;
+        return sum + subscriptionPrice;
+      }, 0);
+    
+    return vipFromNonRenters + vipFromRenters + vipSubscriptionRevenue;
+  }, [vipRevenues, getMonthAppointments, barbersWithChairRental, vipData]);
 
   const chairRentalRevenue = useMemo(() => {
     let totalRental = 0;

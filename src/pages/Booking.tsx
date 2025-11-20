@@ -62,6 +62,9 @@ const Booking = () => {
       return;
     }
 
+    const nextServices = loadServices();
+    setServices(nextServices);
+
     try {
       const parsedService = JSON.parse(storedService) as {
         serviceId?: string;
@@ -76,7 +79,18 @@ const Booking = () => {
           : [];
 
       if (ids.length) {
-        setSelectedServices(ids);
+        const validIds = ids.filter((id) => nextServices.some((service) => service.id === id));
+        if (validIds.length > 0) {
+          setSelectedServices(validIds);
+          
+          setTimeout(() => {
+            const firstSelectedId = validIds[0];
+            const element = document.querySelector(`[data-service-id="${firstSelectedId}"]`);
+            if (element) {
+              element.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+          }, 300);
+        }
       }
     } catch {
       localStorage.removeItem("selectedService");
@@ -134,7 +148,34 @@ const Booking = () => {
 
     const handleStorage = (event: StorageEvent) => {
       if (event.key === "barberbook_admin_services") {
-        setServices(loadServices());
+        const nextServices = loadServices();
+        setServices(nextServices);
+        
+        const storedService = localStorage.getItem("selectedService");
+        if (storedService) {
+          try {
+            const parsedService = JSON.parse(storedService) as {
+              serviceId?: string;
+              serviceIds?: string[];
+            };
+
+            const ids =
+              Array.isArray(parsedService.serviceIds) && parsedService.serviceIds.length > 0
+                ? parsedService.serviceIds
+                : parsedService.serviceId
+                ? [parsedService.serviceId]
+                : [];
+
+            if (ids.length > 0) {
+              const validIds = ids.filter((id) => nextServices.some((service) => service.id === id));
+              if (validIds.length > 0) {
+                setSelectedServices(validIds);
+              }
+            }
+          } catch {
+            // Ignore parsing errors
+          }
+        }
       }
       if (event.key === "barberbook_admin_collaborators") {
         setCollaborators(loadCollaborators());
@@ -768,10 +809,11 @@ const Booking = () => {
                       return (
                         <button
                           key={service.id}
+                          data-service-id={service.id}
                           onClick={() => handleAddService(service.id)}
                           className={`p-6 rounded-lg border-2 text-left transition-all ${
                             isSelected
-                              ? "border-primary bg-primary/5 shadow-gold"
+                              ? "border-primary bg-primary/5 shadow-gold ring-2 ring-primary/20"
                               : "border-border hover:border-primary/50"
                           }`}
                         >

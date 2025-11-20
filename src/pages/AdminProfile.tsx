@@ -13,6 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from "@/components/ui/use-toast";
 import { Barbershop, DEFAULT_BARBERSHOPS } from "@/data/barbershops";
 import { loadBarbershops, persistBarbershops, resetBarbershopsToDefault } from "@/lib/barbershops-storage";
+import { getEmptyInventory, persistInventory } from "@/lib/inventory-storage";
 import { ArrowLeft, MapPin, Star, Phone, Clock, Trash2, Plus, RefreshCcw } from "lucide-react";
 
 const generateUUID = (): string => {
@@ -188,8 +189,12 @@ const AdminProfile = () => {
     setBarbershops((previous) => {
       const updated = [...previous, newBarbershop];
       setActiveId(newBarbershop.id);
+      localStorage.setItem("admin_active_barbershop_id", newBarbershop.id);
       return updated;
     });
+
+    const emptyInventory = getEmptyInventory();
+    persistInventory(emptyInventory, newBarbershop.id);
 
     setAgreedToTerms(false);
     setShowTermsDialog(false);

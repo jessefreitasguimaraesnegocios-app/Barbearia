@@ -32,6 +32,7 @@ interface BookingConfirmation {
     cpf: string;
   };
   timestamp: string;
+  barbershopId?: string;
 }
 
 type PeriodFilter = "day" | "week" | "month";
