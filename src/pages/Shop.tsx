@@ -13,7 +13,7 @@ import { DEFAULT_BARBERSHOP_SELECTION_KEY, getDefaultBarbershopSelection } from 
 
 const PLACEHOLDER_IMAGE = "/placeholder.svg";
 
-type CategoryFilter = "produtos" | "consumo" | "bebidas";
+type CategoryFilter = "produtos" | "consumo" | "bebidas" | "estilo";
 
 const generateNumericId = (id: string): number => {
   let hash = 0;
@@ -233,6 +233,13 @@ const Shop = () => {
               className="min-w-[120px]"
             >
               Bebidas
+            </Button>
+            <Button
+              variant={selectedCategory === "estilo" ? "hero" : "outline"}
+              onClick={() => setSelectedCategory("estilo")}
+              className="min-w-[120px]"
+            >
+              Estilo
             </Button>
           </div>
 

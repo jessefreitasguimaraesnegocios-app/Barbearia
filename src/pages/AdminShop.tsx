@@ -24,7 +24,7 @@ interface ProductFormState {
   rating: string;
   price: string;
   vipPromotionLabel: string;
-  category: "produtos" | "consumo" | "bebidas" | "rascunho" | "";
+  category: "produtos" | "consumo" | "bebidas" | "estilo" | "rascunho" | "";
 }
 
 const PLACEHOLDER_IMAGE = "/placeholder.svg";
@@ -47,7 +47,7 @@ const INITIAL_PRODUCT_FORM: ProductFormState = {
   category: "",
 };
 
-type CategoryFilter = "produtos" | "consumo" | "bebidas";
+type CategoryFilter = "produtos" | "consumo" | "bebidas" | "estilo";
 
 const AdminShop = () => {
   const navigate = useNavigate();
@@ -318,7 +318,7 @@ const AdminShop = () => {
       rating: Number.isNaN(numericRating) ? baseProduct.rating : Math.min(Math.max(numericRating, 0), 5),
       price: Number.isNaN(numericPrice) ? baseProduct.price : Number(numericPrice.toFixed(2)),
       vipPromotionLabel: productForm.vipPromotionLabel.trim(),
-      category: productForm.category as "produtos" | "consumo" | "bebidas" | "rascunho",
+      category: productForm.category as "produtos" | "consumo" | "bebidas" | "estilo" | "rascunho",
     };
 
     setInventory((previous) => {
@@ -487,6 +487,13 @@ const AdminShop = () => {
                   className="min-w-[120px]"
                 >
                   Bebidas
+                </Button>
+                <Button
+                  variant={previewCategory === "estilo" ? "hero" : "outline"}
+                  onClick={() => setPreviewCategory("estilo")}
+                  className="min-w-[120px]"
+                >
+                  Estilo
                 </Button>
               </div>
 
@@ -690,7 +697,7 @@ const AdminShop = () => {
             <Label htmlFor="product-category">Categoria *</Label>
             <Select
               value={productForm.category}
-              onValueChange={(value) => handleProductFormChange("category", value as "produtos" | "consumo" | "bebidas" | "rascunho" | "")}
+              onValueChange={(value) => handleProductFormChange("category", value as "produtos" | "consumo" | "bebidas" | "estilo" | "rascunho" | "")}
               required
             >
               <SelectTrigger id="product-category">
@@ -701,6 +708,7 @@ const AdminShop = () => {
                 <SelectItem value="produtos">Produtos</SelectItem>
                 <SelectItem value="consumo">Consumo</SelectItem>
                 <SelectItem value="bebidas">Bebidas</SelectItem>
+                <SelectItem value="estilo">Estilo</SelectItem>
               </SelectContent>
             </Select>
           </div>
