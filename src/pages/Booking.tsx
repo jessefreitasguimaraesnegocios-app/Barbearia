@@ -39,6 +39,7 @@ const Booking = () => {
     barberId: string;
     date: string;
     time: string;
+    serviceId?: string;
   }>>([]);
   const currencyFormatter = useMemo(
     () => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }),
@@ -103,6 +104,7 @@ const Booking = () => {
       barberId: string;
       date: string;
       time: string;
+      serviceId?: string;
     }> = [];
 
     for (let i = 0; i < localStorage.length; i++) {
@@ -117,12 +119,14 @@ const Booking = () => {
                 barberId: string;
                 date: string;
                 time: string;
+                serviceId?: string;
               }) => {
                 if (apt.barberId && apt.date && apt.time) {
                   bookings.push({
                     barberId: apt.barberId,
                     date: apt.date,
                     time: apt.time,
+                    serviceId: apt.serviceId,
                   });
                 }
               });
@@ -517,6 +521,25 @@ const Booking = () => {
       .filter((date) => !isBefore(date, startOfToday()));
   };
 
+  const getOccupiedSlotsForService = (startTime: string, serviceId: string): string[] => {
+    const service = services.find((s) => s.id === serviceId);
+    if (!service) return [startTime];
+    
+    const durationMinutes = parseDurationToMinutes(service.duration);
+    const requiredSlots = Math.ceil(durationMinutes / 30);
+    const occupiedSlots: string[] = [];
+    
+    let currentTime = startTime;
+    let currentIndex = getTimeSlotIndex(startTime);
+    
+    for (let i = 0; i < requiredSlots && currentIndex !== -1 && currentIndex < timeSlots.length; i++) {
+      occupiedSlots.push(timeSlots[currentIndex]);
+      currentIndex++;
+    }
+    
+    return occupiedSlots;
+  };
+
   const getAvailableTimesForBarber = (barberId: string, date: Date): string[] => {
     const barber = barbers.find((b) => b.id === barberId);
     if (!barber) return [];
@@ -535,7 +558,11 @@ const Booking = () => {
         try {
           const bookingDate = parseISO(booking.date);
           if (isSameDay(bookingDate, date)) {
-            bookedTimes.add(booking.time);
+            // Bloquear todos os slots ocupados pelo serviço
+            const occupiedSlots = booking.serviceId 
+              ? getOccupiedSlotsForService(booking.time, booking.serviceId)
+              : [booking.time];
+            occupiedSlots.forEach((slot) => bookedTimes.add(slot));
           }
         } catch {
           // Ignorar datas inválidas
@@ -546,7 +573,9 @@ const Booking = () => {
     // Verificar também os agendamentos que estão sendo criados agora (mas não o atual)
     appointments.forEach((apt) => {
       if (apt.barberId === barberId && isSameDay(apt.date, date)) {
-        bookedTimes.add(apt.time);
+        // Bloquear todos os slots ocupados pelo serviço
+        const occupiedSlots = getOccupiedSlotsForService(apt.time, apt.serviceId);
+        occupiedSlots.forEach((slot) => bookedTimes.add(slot));
       }
     });
     
