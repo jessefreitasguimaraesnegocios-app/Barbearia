@@ -1,7 +1,7 @@
 import { hashPassword } from "@/lib/password";
 
-export type CollaboratorRole = "barbeiro" | "barbeiro-junior" | "faxineira" | "socio" | "atendente" | "socio-barbeiro" | "dono-barbeiro" | "dono";
-export type PaymentMethod = "salario-fixo" | "aluguel-cadeira-100" | "aluguel-cadeira-50" | "recebe-100-por-cliente" | "recebe-50-por-cliente";
+export type CollaboratorRole = "barbeiro" | "barbeiro-junior" | "faxineira" | "socio" | "atendente" | "socio-barbeiro" | "dono-barbeiro" | "dono" | "socio-investidor";
+export type PaymentMethod = "salario-fixo" | "aluguel-cadeira-100" | "aluguel-cadeira-50" | "recebe-100-por-cliente" | "recebe-50-por-cliente" | "porcentagem";
 
 export interface Collaborator {
   id: string;
@@ -17,6 +17,8 @@ export interface Collaborator {
   experience?: string;
   workSchedule?: string;
   chairRentalAmount?: number;
+  salary?: number;
+  percentagePercentage?: number;
   createdAt: string;
 }
 
@@ -54,6 +56,7 @@ export const COLLABORATOR_ROLES: Array<{ value: CollaboratorRole; label: string 
   { value: "dono-barbeiro", label: "Dono/Barbeiro" },
   { value: "dono", label: "Dono" },
   { value: "socio", label: "Sócio" },
+  { value: "socio-investidor", label: "Sócio investidor" },
   { value: "faxineira", label: "Faxineira" },
   { value: "atendente", label: "Atendente" },
 ];

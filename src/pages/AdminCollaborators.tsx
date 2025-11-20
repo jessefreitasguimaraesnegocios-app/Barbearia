@@ -27,6 +27,8 @@ interface CollaboratorFormState {
   experience: string;
   workSchedule: string;
   chairRentalAmount: string;
+  salary: string;
+  percentagePercentage: string;
 }
 
 const INITIAL_FORM_STATE: CollaboratorFormState = {
@@ -42,6 +44,8 @@ const INITIAL_FORM_STATE: CollaboratorFormState = {
   experience: "",
   workSchedule: "",
   chairRentalAmount: "",
+  salary: "",
+  percentagePercentage: "",
 };
 
 const AdminCollaborators = () => {
@@ -116,6 +120,8 @@ const AdminCollaborators = () => {
         experience: selectedCollaborator.experience || "",
         workSchedule: selectedCollaborator.workSchedule || "",
         chairRentalAmount: selectedCollaborator.chairRentalAmount ? String(selectedCollaborator.chairRentalAmount) : "",
+        salary: selectedCollaborator.salary ? String(selectedCollaborator.salary) : "",
+        percentagePercentage: selectedCollaborator.percentagePercentage ? String(selectedCollaborator.percentagePercentage) : "",
       });
     } else {
       setFormState(INITIAL_FORM_STATE);
@@ -151,15 +157,31 @@ const AdminCollaborators = () => {
     }
 
     const isChairRental = formState.paymentMethod === "aluguel-cadeira-100" || 
-                          formState.paymentMethod === "aluguel-cadeira-50" ||
-                          formState.paymentMethod === "recebe-100-por-cliente" ||
-                          formState.paymentMethod === "recebe-50-por-cliente";
+                          formState.paymentMethod === "aluguel-cadeira-50";
 
     if (isChairRental && (!formState.chairRentalAmount || parseFloat(formState.chairRentalAmount) <= 0)) {
       toast({
         variant: "destructive",
         title: "Valor de aluguel obrigatório",
         description: "Informe o valor do aluguel de cadeira quando a forma de pagamento for relacionada a aluguel.",
+      });
+      return;
+    }
+
+    if (formState.paymentMethod === "salario-fixo" && (!formState.salary || parseFloat(formState.salary) <= 0)) {
+      toast({
+        variant: "destructive",
+        title: "Salário obrigatório",
+        description: "Informe o valor do salário quando a forma de pagamento for Salário Fixo.",
+      });
+      return;
+    }
+
+    if (formState.paymentMethod === "porcentagem" && (!formState.percentagePercentage || parseFloat(formState.percentagePercentage) <= 0 || parseFloat(formState.percentagePercentage) > 100)) {
+      toast({
+        variant: "destructive",
+        title: "Porcentagem obrigatória",
+        description: "Informe uma porcentagem válida entre 0 e 100 quando a forma de pagamento for Porcentagem.",
       });
       return;
     }
@@ -220,6 +242,8 @@ const AdminCollaborators = () => {
                 experience: formState.experience.trim() || undefined,
                 workSchedule: formState.workSchedule.trim() || undefined,
                 chairRentalAmount: isChairRental && formState.chairRentalAmount ? parseFloat(formState.chairRentalAmount) : undefined,
+                salary: formState.paymentMethod === "salario-fixo" && formState.salary ? parseFloat(formState.salary) : undefined,
+                percentagePercentage: formState.paymentMethod === "porcentagem" && formState.percentagePercentage ? parseFloat(formState.percentagePercentage) : undefined,
               }
             : collaborator,
         ),
@@ -246,6 +270,8 @@ const AdminCollaborators = () => {
       experience: formState.experience.trim() || undefined,
       workSchedule: formState.workSchedule.trim() || undefined,
       chairRentalAmount: isChairRental && formState.chairRentalAmount ? parseFloat(formState.chairRentalAmount) : undefined,
+      salary: formState.paymentMethod === "salario-fixo" && formState.salary ? parseFloat(formState.salary) : undefined,
+      percentagePercentage: formState.paymentMethod === "porcentagem" && formState.percentagePercentage ? parseFloat(formState.percentagePercentage) : undefined,
       createdAt: new Date().toISOString(),
     };
 
@@ -591,15 +617,54 @@ const AdminCollaborators = () => {
                           <SelectItem value="aluguel-cadeira-50">Aluguel de Cadeira - Recebe 50% por cliente</SelectItem>
                           <SelectItem value="recebe-100-por-cliente">Recebe 100% por cliente</SelectItem>
                           <SelectItem value="recebe-50-por-cliente">Recebe 50% por cliente</SelectItem>
+                          <SelectItem value="porcentagem">Porcentagem</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                   </div>
 
+                  {formState.paymentMethod === "salario-fixo" && (
+                    <div className="space-y-2">
+                      <Label htmlFor="collaborator-salary">
+                        Salário <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        id="collaborator-salary"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formState.salary}
+                        onChange={(event) => handleInputChange("salary", event.target.value)}
+                        placeholder="0.00"
+                        required
+                      />
+                    </div>
+                  )}
+
+                  {formState.paymentMethod === "porcentagem" && (
+                    <div className="space-y-2">
+                      <Label htmlFor="collaborator-percentage">
+                        Porcentagem (%) <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        id="collaborator-percentage"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        value={formState.percentagePercentage}
+                        onChange={(event) => handleInputChange("percentagePercentage", event.target.value)}
+                        placeholder="0.00"
+                        required
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        Porcentagem que o colaborador receberá sobre o valor de cada atendimento
+                      </p>
+                    </div>
+                  )}
+
                   {(formState.paymentMethod === "aluguel-cadeira-100" || 
-                    formState.paymentMethod === "aluguel-cadeira-50" ||
-                    formState.paymentMethod === "recebe-100-por-cliente" ||
-                    formState.paymentMethod === "recebe-50-por-cliente") && (
+                    formState.paymentMethod === "aluguel-cadeira-50") && (
                     <div className="space-y-2">
                       <Label htmlFor="collaborator-chair-rental-amount">
                         Alugar Cadeira <span className="text-destructive">*</span>

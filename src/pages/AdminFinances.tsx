@@ -266,6 +266,7 @@ const AdminFinances = () => {
 
   const revenueWithoutChairRental = useMemo(() => {
     const barbersWithChairRental = new Set<string>();
+    const barbersWithPercentage = new Map<string, number>();
     
     collaborators.forEach((collaborator) => {
       const paymentMethod = collaborator.paymentMethod;
@@ -276,12 +277,22 @@ const AdminFinances = () => {
         barbersWithChairRental.add(collaborator.id);
         const barberSlug = getBarberIdFromCollaborator(collaborator);
         barbersWithChairRental.add(barberSlug);
+      } else if (paymentMethod === "porcentagem" && collaborator.percentagePercentage) {
+        barbersWithPercentage.set(collaborator.id, collaborator.percentagePercentage);
+        const barberSlug = getBarberIdFromCollaborator(collaborator);
+        barbersWithPercentage.set(barberSlug, collaborator.percentagePercentage);
       }
     });
     
     return barbershopRevenue
       .filter((apt) => !barbersWithChairRental.has(apt.barberId))
-      .reduce((sum, apt) => sum + apt.price, 0);
+      .reduce((sum, apt) => {
+        const percentage = barbersWithPercentage.get(apt.barberId);
+        if (percentage) {
+          return sum + apt.price * (1 - percentage / 100);
+        }
+        return sum + apt.price;
+      }, 0);
   }, [barbershopRevenue, collaborators]);
 
   const vipSubscriptionRevenue = useMemo(() => {
@@ -311,15 +322,32 @@ const AdminFinances = () => {
       if (collaborator.paymentMethod === "salario-fixo") {
         expenses.push({
           name: `${collaborator.name} - Salário Fixo`,
-          amount: 0,
+          amount: collaborator.salary || 0,
           type: "salario",
         });
+      } else if (collaborator.paymentMethod === "porcentagem") {
+        if (collaborator.percentagePercentage && collaborator.percentagePercentage > 0) {
+          const barberId = collaborator.id;
+          const barberSlug = getBarberIdFromCollaborator(collaborator);
+          
+          const barberAppointments = barbershopRevenue.filter((apt) => 
+            apt.barberId === barberId || apt.barberId === barberSlug
+          );
+          
+          const barberRevenue = barberAppointments.reduce((sum, apt) => sum + apt.price, 0);
+          const percentageAmount = barberRevenue * (collaborator.percentagePercentage / 100);
+          
+          expenses.push({
+            name: `${collaborator.name} - Porcentagem (${collaborator.percentagePercentage}%)`,
+            amount: percentageAmount,
+            type: "aluguel",
+          });
+        }
       } else {
         const paymentMethod = collaborator.paymentMethod;
-        const is100Percent = paymentMethod === "aluguel-cadeira-100" || paymentMethod === "recebe-100-por-cliente";
         const is50Percent = paymentMethod === "aluguel-cadeira-50" || paymentMethod === "recebe-50-por-cliente";
         
-        if (is100Percent || is50Percent) {
+        if (is50Percent) {
           const barberId = collaborator.id;
           const barberSlug = getBarberIdFromCollaborator(collaborator);
           
@@ -329,25 +357,14 @@ const AdminFinances = () => {
           
           const barberRevenue = barberAppointments.reduce((sum, apt) => sum + apt.price, 0);
           
-          if (is100Percent) {
-            const label = paymentMethod === "aluguel-cadeira-100" 
-              ? "Aluguel de Cadeira (100%)" 
-              : "Recebe 100% por cliente";
-            expenses.push({
-              name: `${collaborator.name} - ${label}`,
-              amount: barberRevenue,
-              type: "aluguel",
-            });
-          } else if (is50Percent) {
-            const label = paymentMethod === "aluguel-cadeira-50" 
-              ? "Aluguel de Cadeira (50%)" 
-              : "Recebe 50% por cliente";
-            expenses.push({
-              name: `${collaborator.name} - ${label}`,
-              amount: barberRevenue * 0.5,
-              type: "aluguel",
-            });
-          }
+          const label = paymentMethod === "aluguel-cadeira-50" 
+            ? "Aluguel de Cadeira (50%)" 
+            : "Recebe 50% por cliente";
+          expenses.push({
+            name: `${collaborator.name} - ${label}`,
+            amount: barberRevenue * 0.5,
+            type: "aluguel",
+          });
         }
       }
     });
@@ -551,7 +568,7 @@ const AdminFinances = () => {
                             <span className="font-medium text-sm">{expense.name}</span>
                           </div>
                           <span className="text-lg font-bold text-destructive ml-2">
-                            {expense.type === "salario" ? "A definir" : currencyFormatter.format(expense.amount)}
+                            {currencyFormatter.format(expense.amount)}
                           </span>
                         </div>
                         {expense.type === "salario" && (
