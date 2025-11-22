@@ -150,6 +150,15 @@ const AdminProfile = () => {
       return;
     }
 
+    if (!selectedBarbershop.pixKey.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Chave Pix obrigatória",
+        description: "Preencha a Chave Pix da barbearia.",
+      });
+      return;
+    }
+
     persistBarbershops(barbershops);
 
     toast({
@@ -182,6 +191,7 @@ const AdminProfile = () => {
       hours: "",
       isOpen: true,
       email: "",
+      pixKey: "",
       status: "disponivel",
       dataVencimento: vencimento.toISOString().split("T")[0],
     };
@@ -488,6 +498,20 @@ const AdminProfile = () => {
                           onChange={handleRatingChange}
                         />
                       </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="barbershop-pix-key">
+                        Chave Pix <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        id="barbershop-pix-key"
+                        type="text"
+                        value={selectedBarbershop.pixKey}
+                        onChange={(event) => handleUpdate("pixKey", event.target.value)}
+                        placeholder="Digite a chave Pix"
+                        required
+                      />
                     </div>
 
                     <div className="flex items-center justify-between rounded-lg border border-border px-4 py-3">

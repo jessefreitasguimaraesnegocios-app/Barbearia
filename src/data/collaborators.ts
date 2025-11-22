@@ -19,6 +19,7 @@ export interface Collaborator {
   chairRentalAmount?: number;
   salary?: number;
   percentagePercentage?: number;
+  pixKey: string;
   createdAt: string;
 }
 
@@ -33,6 +34,7 @@ export const DEFAULT_COLLABORATORS: Collaborator[] = [
     role: "barbeiro",
     specialty: "Cortes clássicos e barbas",
     paymentMethod: "aluguel-cadeira-100",
+    pixKey: "",
     createdAt: new Date("2024-01-05T10:00:00Z").toISOString(),
   },
   {
@@ -45,6 +47,7 @@ export const DEFAULT_COLLABORATORS: Collaborator[] = [
     role: "socio",
     specialty: "Gestão administrativa",
     paymentMethod: "salario-fixo",
+    pixKey: "",
     createdAt: new Date("2024-02-01T15:30:00Z").toISOString(),
   },
 ];

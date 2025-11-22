@@ -265,7 +265,8 @@ const AdminFinances = () => {
   }, [collaborators]);
 
   const revenueWithoutChairRental = useMemo(() => {
-    const barbersWithChairRental = new Set<string>();
+    const barbersWith100PercentRental = new Set<string>();
+    const barbersWith50PercentRental = new Set<string>();
     const barbersWithPercentage = new Map<string, number>();
     
     collaborators.forEach((collaborator) => {
@@ -273,10 +274,14 @@ const AdminFinances = () => {
       const is100Percent = paymentMethod === "aluguel-cadeira-100" || paymentMethod === "recebe-100-por-cliente";
       const is50Percent = paymentMethod === "aluguel-cadeira-50" || paymentMethod === "recebe-50-por-cliente";
       
-      if (is100Percent || is50Percent) {
-        barbersWithChairRental.add(collaborator.id);
+      if (is100Percent) {
+        barbersWith100PercentRental.add(collaborator.id);
         const barberSlug = getBarberIdFromCollaborator(collaborator);
-        barbersWithChairRental.add(barberSlug);
+        barbersWith100PercentRental.add(barberSlug);
+      } else if (is50Percent) {
+        barbersWith50PercentRental.add(collaborator.id);
+        const barberSlug = getBarberIdFromCollaborator(collaborator);
+        barbersWith50PercentRental.add(barberSlug);
       } else if (paymentMethod === "porcentagem" && collaborator.percentagePercentage) {
         barbersWithPercentage.set(collaborator.id, collaborator.percentagePercentage);
         const barberSlug = getBarberIdFromCollaborator(collaborator);
@@ -284,15 +289,30 @@ const AdminFinances = () => {
       }
     });
     
-    return barbershopRevenue
-      .filter((apt) => !barbersWithChairRental.has(apt.barberId))
-      .reduce((sum, apt) => {
+    let totalRevenue = 0;
+    
+    barbershopRevenue.forEach((apt) => {
+      const is100Percent = barbersWith100PercentRental.has(apt.barberId);
+      const is50Percent = barbersWith50PercentRental.has(apt.barberId);
+      
+      if (is100Percent) {
+        // 100% vai para o colaborador, nada vai para a receita normal
+        // Não adiciona nada
+      } else if (is50Percent) {
+        // 50% vai para a Receita Barbearia, os outros 50% vão para o colaborador mas NÃO aparecem como despesa
+        totalRevenue += apt.price * 0.5;
+      } else {
+        // Outros casos
         const percentage = barbersWithPercentage.get(apt.barberId);
         if (percentage) {
-          return sum + apt.price * (1 - percentage / 100);
+          totalRevenue += apt.price * (1 - percentage / 100);
+        } else {
+          totalRevenue += apt.price;
         }
-        return sum + apt.price;
-      }, 0);
+      }
+    });
+    
+    return totalRevenue;
   }, [barbershopRevenue, collaborators]);
 
   const vipSubscriptionRevenue = useMemo(() => {
@@ -343,30 +363,10 @@ const AdminFinances = () => {
             type: "aluguel",
           });
         }
-      } else {
-        const paymentMethod = collaborator.paymentMethod;
-        const is50Percent = paymentMethod === "aluguel-cadeira-50" || paymentMethod === "recebe-50-por-cliente";
-        
-        if (is50Percent) {
-          const barberId = collaborator.id;
-          const barberSlug = getBarberIdFromCollaborator(collaborator);
-          
-          const barberAppointments = barbershopRevenue.filter((apt) => 
-            apt.barberId === barberId || apt.barberId === barberSlug
-          );
-          
-          const barberRevenue = barberAppointments.reduce((sum, apt) => sum + apt.price, 0);
-          
-          const label = paymentMethod === "aluguel-cadeira-50" 
-            ? "Aluguel de Cadeira (50%)" 
-            : "Recebe 50% por cliente";
-          expenses.push({
-            name: `${collaborator.name} - ${label}`,
-            amount: barberRevenue * 0.5,
-            type: "aluguel",
-          });
-        }
       }
+      // Para colaboradores com 50% (aluguel-cadeira-50 ou recebe-50-por-cliente):
+      // 50% vai para a Receita Barbearia e não aparece como despesa
+      // Os 50% restantes ficam com o colaborador mas não são registrados como despesa
     });
     
     return expenses;

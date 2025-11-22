@@ -24,6 +24,7 @@ const isValidCollaborator = (entry: unknown): entry is Collaborator => {
     ["barbeiro", "barbeiro-junior", "socio-barbeiro", "dono-barbeiro", "dono", "faxineira", "socio", "socio-investidor", "atendente"].includes(typed.role) &&
     typeof typed.specialty === "string" &&
     typeof typed.createdAt === "string" &&
+    (typed.pixKey === undefined || typeof typed.pixKey === "string") &&
     (typed.photoUrl === undefined || typeof typed.photoUrl === "string") &&
     (typed.experience === undefined || typeof typed.experience === "string") &&
     (typed.workSchedule === undefined || typeof typed.workSchedule === "string")
@@ -34,6 +35,7 @@ const sanitizeCollaborator = (entry: Collaborator): Collaborator => ({
   ...entry,
   password: entry.password || hashPassword(entry.cpf),
   specialty: entry.specialty ?? "",
+  pixKey: entry.pixKey ?? "",
   paymentMethod: entry.paymentMethod,
   photoUrl: entry.photoUrl,
   experience: entry.experience,

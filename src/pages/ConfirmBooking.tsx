@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
@@ -6,9 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Calendar as CalendarIcon, Clock, User, Check, ArrowLeft } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, User, Check, ArrowLeft, Crown } from "lucide-react";
 import { DEFAULT_SERVICES, ServiceItem } from "@/data/services";
 import { loadServices } from "@/lib/services-storage";
+import { loadVipData, VipMember } from "@/lib/vips-storage";
 
 interface Appointment {
   id: string;
@@ -58,10 +59,14 @@ const ConfirmBooking = () => {
     phone: "",
     cpf: "",
   });
+  const [vipMembers, setVipMembers] = useState<VipMember[]>([]);
 
   useEffect(() => {
     const nextServices = loadServices();
     setServices(nextServices);
+
+    const vipData = loadVipData();
+    setVipMembers(vipData.members);
 
     const storedAppointments = localStorage.getItem("bookingAppointments");
     if (storedAppointments) {
@@ -89,6 +94,39 @@ const ConfirmBooking = () => {
   const handlePaymentDataChange = (field: keyof PaymentData, value: string) => {
     setPaymentData((prev) => ({ ...prev, [field]: value }));
   };
+
+  const isVipClient = useMemo(() => {
+    if (!paymentData.fullName || !paymentData.cpf || !paymentData.phone) {
+      return null;
+    }
+
+    const normalizedName = paymentData.fullName.toLowerCase().trim();
+    const normalizedCpf = paymentData.cpf.replace(/\D/g, "");
+    const normalizedPhone = paymentData.phone.replace(/\D/g, "");
+
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    return vipMembers.find((member) => {
+      const memberName = member.name.toLowerCase().trim();
+      const memberCpf = member.cpf.replace(/\D/g, "");
+      const memberPhone = member.phone.replace(/\D/g, "");
+
+      const matches = 
+        memberName === normalizedName &&
+        memberCpf === normalizedCpf &&
+        memberPhone === normalizedPhone;
+
+      if (!matches) return false;
+
+      if (member.paymentStatus !== "paid") return false;
+
+      const expiresAt = new Date(member.expiresAt);
+      expiresAt.setHours(0, 0, 0, 0);
+
+      return expiresAt >= now;
+    }) || null;
+  }, [paymentData.fullName, paymentData.cpf, paymentData.phone, vipMembers]);
 
   const formatCPF = (value: string) => {
     const numbers = value.replace(/\D/g, "");
@@ -143,6 +181,8 @@ const ConfirmBooking = () => {
         payment: paymentData,
         timestamp: new Date().toISOString(),
         barbershopId: barbershopId || undefined,
+        isVip: isVipClient !== null,
+        vipMemberId: isVipClient?.id,
       };
       
       const bookingKey = `bookingConfirmation_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
@@ -159,6 +199,7 @@ const ConfirmBooking = () => {
   const calculateTotal = () => {
     let total = 0;
     const vipServiceFirstOccurrence = new Map<string, boolean>();
+    const isClientVip = isVipClient !== null;
     
     appointments.forEach((apt) => {
       const service = services.find((s) => s.id === apt.serviceId);
@@ -169,12 +210,16 @@ const ConfirmBooking = () => {
           service.discountPercentage > 0;
         
         if (hasDiscount && service.promotionScope === "vip") {
-          const isFirst = !vipServiceFirstOccurrence.has(apt.serviceId);
-          vipServiceFirstOccurrence.set(apt.serviceId, true);
-          
-          if (isFirst) {
-            const discountedPrice = service.price * (1 - (service.discountPercentage! / 100));
-            total += discountedPrice;
+          if (isClientVip) {
+            const isFirst = !vipServiceFirstOccurrence.has(apt.serviceId);
+            vipServiceFirstOccurrence.set(apt.serviceId, true);
+            
+            if (isFirst) {
+              const discountedPrice = service.price * (1 - (service.discountPercentage! / 100));
+              total += discountedPrice;
+            } else {
+              total += service.price;
+            }
           } else {
             total += service.price;
           }
@@ -230,12 +275,15 @@ const ConfirmBooking = () => {
                     service?.discountPercentage !== null &&
                     service?.discountPercentage > 0;
                   
+                  const isClientVip = isVipClient !== null;
+                  const isVipService = service?.promotionScope === "vip";
                   const isVipFirstOccurrence = hasDiscount && 
-                    service?.promotionScope === "vip" &&
+                    isVipService &&
+                    isClientVip &&
                     appointments.findIndex((apt) => apt.serviceId === appointment.serviceId) === index;
                   
-                  const finalPrice = hasDiscount && service?.promotionScope === "vip"
-                    ? (isVipFirstOccurrence 
+                  const finalPrice = hasDiscount && isVipService
+                    ? (isClientVip && isVipFirstOccurrence 
                         ? service!.price * (1 - (service!.discountPercentage! / 100))
                         : service!.price)
                     : hasDiscount
@@ -249,11 +297,17 @@ const ConfirmBooking = () => {
                           <div className="flex items-center gap-2 mb-2">
                             <h3 className="font-semibold text-lg">{service?.title}</h3>
                             {isVipFirstOccurrence && (
-                              <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
+                              <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded flex items-center gap-1">
+                                <Crown className="h-3 w-3" />
                                 VIP -{service?.discountPercentage}% (1ª vez)
                               </span>
                             )}
-                            {service?.promotionScope === "vip" && hasDiscount && !isVipFirstOccurrence && (
+                            {isVipService && hasDiscount && !isClientVip && (
+                              <span className="text-xs bg-secondary text-muted-foreground px-2 py-1 rounded">
+                                Desconto VIP não aplicável
+                              </span>
+                            )}
+                            {isVipService && isClientVip && !isVipFirstOccurrence && (
                               <span className="text-xs bg-secondary text-muted-foreground px-2 py-1 rounded">
                                 Sem desconto VIP
                               </span>
@@ -313,9 +367,25 @@ const ConfirmBooking = () => {
             {areAllClientNamesFilled() && (
               <Card className="shadow-card border-border">
                 <CardHeader>
-                  <CardTitle className="text-2xl">Dados para Pagamento</CardTitle>
+                  <CardTitle className="text-2xl flex items-center gap-2">
+                    Dados para Pagamento
+                    {isVipClient && (
+                      <span className="text-xs bg-primary/10 text-primary px-3 py-1 rounded-full flex items-center gap-1">
+                        <Crown className="h-4 w-4" />
+                        Cliente VIP
+                      </span>
+                    )}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {isVipClient && (
+                    <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                      <p className="text-sm text-primary font-medium flex items-center gap-2">
+                        <Crown className="h-4 w-4" />
+                        Cliente VIP identificado! Descontos serão aplicados automaticamente.
+                      </p>
+                    </div>
+                  )}
                   <div>
                     <Label htmlFor="fullName" className="text-sm font-medium">
                       Nome Completo <span className="text-destructive">*</span>
@@ -363,6 +433,12 @@ const ConfirmBooking = () => {
             {/* Total and Payment Button */}
             <Card className="shadow-card border-border">
               <CardContent className="pt-6">
+                {isVipClient === null && isPaymentFormValid() && (
+                  <div className="mb-4 p-3 bg-card border border-border rounded-lg">
+                    <p className="text-sm text-muted-foreground mb-1">Receita Normal</p>
+                    <p className="text-lg font-semibold">{currencyFormatter.format(calculateTotal())}</p>
+                  </div>
+                )}
                 <div className="flex items-center justify-between mb-6">
                   <span className="text-lg font-semibold">Total:</span>
                   <span className="text-2xl font-bold text-primary">

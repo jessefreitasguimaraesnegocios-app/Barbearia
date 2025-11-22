@@ -29,6 +29,7 @@ interface CollaboratorFormState {
   chairRentalAmount: string;
   salary: string;
   percentagePercentage: string;
+  pixKey: string;
 }
 
 const INITIAL_FORM_STATE: CollaboratorFormState = {
@@ -46,6 +47,7 @@ const INITIAL_FORM_STATE: CollaboratorFormState = {
   chairRentalAmount: "",
   salary: "",
   percentagePercentage: "",
+  pixKey: "",
 };
 
 const AdminCollaborators = () => {
@@ -122,6 +124,7 @@ const AdminCollaborators = () => {
         chairRentalAmount: selectedCollaborator.chairRentalAmount ? String(selectedCollaborator.chairRentalAmount) : "",
         salary: selectedCollaborator.salary ? String(selectedCollaborator.salary) : "",
         percentagePercentage: selectedCollaborator.percentagePercentage ? String(selectedCollaborator.percentagePercentage) : "",
+        pixKey: selectedCollaborator.pixKey || "",
       });
     } else {
       setFormState(INITIAL_FORM_STATE);
@@ -147,11 +150,11 @@ const AdminCollaborators = () => {
   const upsertCollaborator = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!formState.name.trim() || !formState.email.trim() || !formState.cpf.trim()) {
+    if (!formState.name.trim() || !formState.email.trim() || !formState.cpf.trim() || !formState.pixKey.trim()) {
       toast({
         variant: "destructive",
         title: "Dados incompletos",
-        description: "Preencha nome, e-mail e CPF do colaborador.",
+        description: "Preencha nome, e-mail, CPF e Chave Pix do colaborador.",
       });
       return;
     }
@@ -244,6 +247,7 @@ const AdminCollaborators = () => {
                 chairRentalAmount: isChairRental && formState.chairRentalAmount ? parseFloat(formState.chairRentalAmount) : undefined,
                 salary: formState.paymentMethod === "salario-fixo" && formState.salary ? parseFloat(formState.salary) : undefined,
                 percentagePercentage: formState.paymentMethod === "porcentagem" && formState.percentagePercentage ? parseFloat(formState.percentagePercentage) : undefined,
+                pixKey: formState.pixKey.trim(),
               }
             : collaborator,
         ),
@@ -272,6 +276,7 @@ const AdminCollaborators = () => {
       chairRentalAmount: isChairRental && formState.chairRentalAmount ? parseFloat(formState.chairRentalAmount) : undefined,
       salary: formState.paymentMethod === "salario-fixo" && formState.salary ? parseFloat(formState.salary) : undefined,
       percentagePercentage: formState.paymentMethod === "porcentagem" && formState.percentagePercentage ? parseFloat(formState.percentagePercentage) : undefined,
+      pixKey: formState.pixKey.trim(),
       createdAt: new Date().toISOString(),
     };
 
@@ -697,6 +702,19 @@ const AdminCollaborators = () => {
                         onChange={(event) => handleInputChange("password", event.target.value)}
                         placeholder={selectedCollaborator ? "Informe apenas se desejar alterar" : "Defina uma senha"}
                         required={!selectedCollaborator}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="collaborator-pix-key">
+                        Chave Pix <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        id="collaborator-pix-key"
+                        type="text"
+                        value={formState.pixKey}
+                        onChange={(event) => handleInputChange("pixKey", event.target.value)}
+                        placeholder="Digite a chave Pix"
+                        required
                       />
                     </div>
                   </div>

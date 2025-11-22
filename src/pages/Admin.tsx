@@ -81,6 +81,8 @@ interface BookingConfirmation {
   };
   timestamp: string;
   barbershopId?: string;
+  isVip?: boolean;
+  vipMemberId?: string;
 }
 
 interface SelectedAppointment {
@@ -497,6 +499,9 @@ const Admin = () => {
     let monthlyBookingRevenue = 0;
 
     allBookings.forEach((booking) => {
+      const vipServiceFirstOccurrence = new Map<string, boolean>();
+      const isClientVip = booking.isVip === true;
+      
       booking.appointments.forEach((apt) => {
         const aptDate = parseISO(apt.date);
         const service = services.find((s) => s.id === apt.serviceId);
@@ -507,13 +512,21 @@ const Admin = () => {
             service.discountPercentage !== null &&
             service.discountPercentage > 0;
           
+          const isVipService = service.promotionScope === "vip";
+          
           let price = service.price;
           if (hasDiscount) {
-            if (service.promotionScope === "vip") {
-              // Para VIP, aplicar desconto apenas na primeira vez
-              price = service.price * (1 - (service.discountPercentage / 100));
-            } else {
-              price = service.price * (1 - (service.discountPercentage / 100));
+            if (isVipService && isClientVip) {
+              // Para serviços VIP, aplicar desconto apenas na primeira vez que o serviço aparece no booking
+              const isFirst = !vipServiceFirstOccurrence.has(apt.serviceId);
+              vipServiceFirstOccurrence.set(apt.serviceId, true);
+              
+              if (isFirst) {
+                price = service.price * (1 - (service.discountPercentage! / 100));
+              }
+            } else if (!isVipService) {
+              // Para serviços não VIP, aplicar desconto normalmente
+              price = service.price * (1 - (service.discountPercentage! / 100));
             }
           }
 

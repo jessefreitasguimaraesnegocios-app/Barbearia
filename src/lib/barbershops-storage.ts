@@ -24,6 +24,7 @@ const isValidBarbershop = (entry: unknown): entry is Barbershop => {
     typeof typed.hours === "string" &&
     typeof typed.isOpen === "boolean" &&
     typeof typed.email === "string" &&
+    (typed.pixKey === undefined || typeof typed.pixKey === "string") &&
     (typed.status === undefined || typed.status === "disponivel" || typed.status === "indisponivel") &&
     (typed.dataPagamento === undefined || typeof typed.dataPagamento === "string") &&
     (typed.dataVencimento === undefined || typeof typed.dataVencimento === "string")
@@ -33,6 +34,7 @@ const isValidBarbershop = (entry: unknown): entry is Barbershop => {
 const sanitizeBarbershop = (entry: Barbershop): Barbershop => ({
   ...entry,
   rating: Number(entry.rating.toFixed(1)),
+  pixKey: entry.pixKey ?? "",
 });
 
 export const checkPaymentStatus = (barbershop: Barbershop): Barbershop | null => {

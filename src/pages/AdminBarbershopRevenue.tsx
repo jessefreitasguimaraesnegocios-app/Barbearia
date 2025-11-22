@@ -32,6 +32,8 @@ interface BookingConfirmation {
   };
   timestamp: string;
   barbershopId?: string;
+  isVip?: boolean;
+  vipMemberId?: string;
 }
 
 interface AppointmentRevenue {
@@ -139,6 +141,9 @@ const AdminBarbershopRevenue = () => {
     const appointments: AppointmentRevenue[] = [];
     
     allBookings.forEach((booking) => {
+      const vipServiceFirstOccurrence = new Map<string, boolean>();
+      const isClientVip = booking.isVip === true;
+      
       booking.appointments.forEach((apt) => {
         const aptDate = parseISO(apt.date);
         if (isWithinInterval(aptDate, { start: startDate, end: endDate })) {
@@ -149,13 +154,22 @@ const AdminBarbershopRevenue = () => {
               service.discountPercentage !== null &&
               service.discountPercentage > 0;
             
-            const isVip = service.promotionScope === "vip";
+            const isVipService = service.promotionScope === "vip";
+            const isVip = isClientVip && isVipService;
             
-            const price = hasDiscount && isVip
-              ? service.price * (1 - (service.discountPercentage! / 100))
-              : hasDiscount
-                ? service.price * (1 - (service.discountPercentage! / 100))
-                : service.price;
+            let price = service.price;
+            if (hasDiscount) {
+              if (isVipService && isClientVip) {
+                const isFirst = !vipServiceFirstOccurrence.has(apt.serviceId);
+                vipServiceFirstOccurrence.set(apt.serviceId, true);
+                
+                if (isFirst) {
+                  price = service.price * (1 - (service.discountPercentage! / 100));
+                }
+              } else if (!isVipService) {
+                price = service.price * (1 - (service.discountPercentage! / 100));
+              }
+            }
             
             const collaborator = collaborators.find((c) => 
               c.id === apt.barberId || getBarberIdFromCollaborator(c) === apt.barberId
@@ -172,7 +186,7 @@ const AdminBarbershopRevenue = () => {
               time: apt.time,
               price,
               isVip,
-              discountPercentage: hasDiscount ? service.discountPercentage : undefined,
+              discountPercentage: hasDiscount && isVip && price < service.price ? service.discountPercentage : undefined,
             });
           }
         }
@@ -254,14 +268,27 @@ const AdminBarbershopRevenue = () => {
     return Array.from(vipMap.values()).sort((a, b) => b.totalRevenue - a.totalRevenue);
   }, [getMonthAppointments, vipData]);
 
-  const barbersWithChairRental = useMemo(() => {
+  const barbersWith100PercentRental = useMemo(() => {
     const barberIds = new Set<string>();
     collaborators.forEach((collaborator) => {
       const paymentMethod = collaborator.paymentMethod;
       const is100Percent = paymentMethod === "aluguel-cadeira-100" || paymentMethod === "recebe-100-por-cliente";
+      
+      if (is100Percent) {
+        barberIds.add(collaborator.id);
+        barberIds.add(getBarberIdFromCollaborator(collaborator));
+      }
+    });
+    return barberIds;
+  }, [collaborators]);
+
+  const barbersWith50PercentRental = useMemo(() => {
+    const barberIds = new Set<string>();
+    collaborators.forEach((collaborator) => {
+      const paymentMethod = collaborator.paymentMethod;
       const is50Percent = paymentMethod === "aluguel-cadeira-50" || paymentMethod === "recebe-50-por-cliente";
       
-      if (is100Percent || is50Percent) {
+      if (is50Percent) {
         barberIds.add(collaborator.id);
         barberIds.add(getBarberIdFromCollaborator(collaborator));
       }
@@ -270,23 +297,68 @@ const AdminBarbershopRevenue = () => {
   }, [collaborators]);
 
   const totalNonVipRevenue = useMemo(() => {
-    return getMonthAppointments
-      .filter((apt) => !apt.isVip && !barbersWithChairRental.has(apt.barberId))
-      .reduce((sum, apt) => sum + apt.price, 0);
-  }, [getMonthAppointments, barbersWithChairRental]);
+    let totalRevenue = 0;
+    
+    getMonthAppointments
+      .filter((apt) => !apt.isVip)
+      .forEach((apt) => {
+        const is100Percent = barbersWith100PercentRental.has(apt.barberId);
+        const is50Percent = barbersWith50PercentRental.has(apt.barberId);
+        
+        if (is100Percent) {
+          // 100% vai para o colaborador, nada vai para a receita normal
+          // Não adiciona nada
+        } else if (is50Percent) {
+          // 50% vai para a Receita Barbearia, os outros 50% vão para o colaborador mas NÃO aparecem como despesa
+          totalRevenue += apt.price * 0.5;
+        } else {
+          // Outros casos - valor total
+          totalRevenue += apt.price;
+        }
+      });
+    
+    return totalRevenue;
+  }, [getMonthAppointments, barbersWith100PercentRental, barbersWith50PercentRental]);
 
   const totalVipRevenue = useMemo(() => {
     // Receita dos serviços VIP (com desconto)
-    const vipFromNonRenters = getMonthAppointments
-      .filter((apt) => apt.isVip && !barbersWithChairRental.has(apt.barberId))
-      .reduce((sum, apt) => sum + apt.price, 0);
+    let vipFromNonRenters = 0;
+    getMonthAppointments
+      .filter((apt) => apt.isVip)
+      .forEach((apt) => {
+        const is100Percent = barbersWith100PercentRental.has(apt.barberId);
+        const is50Percent = barbersWith50PercentRental.has(apt.barberId);
+        
+        if (is100Percent) {
+          // 100% vai para o colaborador, nada vai para a receita normal
+          // Não adiciona nada
+          } else if (is50Percent) {
+            // 50% vai para a Receita Barbearia
+            vipFromNonRenters += apt.price * 0.5;
+        } else {
+          // Valor total
+          vipFromNonRenters += apt.price;
+        }
+      });
     
-    const vipFromRenters = vipRevenues.reduce((sum, vip) => {
-      const clientVipRevenue = vip.appointments
-        .filter((apt) => !barbersWithChairRental.has(apt.barberId))
-        .reduce((sum, apt) => sum + apt.price, 0);
-      return sum + clientVipRevenue;
-    }, 0);
+    let vipFromRenters = 0;
+    vipRevenues.forEach((vip) => {
+      vip.appointments.forEach((apt) => {
+        const is100Percent = barbersWith100PercentRental.has(apt.barberId);
+        const is50Percent = barbersWith50PercentRental.has(apt.barberId);
+        
+        if (is100Percent) {
+          // 100% vai para o colaborador, nada vai para a receita normal
+          // Não adiciona nada
+          } else if (is50Percent) {
+            // 50% vai para a Receita Barbearia
+            vipFromRenters += apt.price * 0.5;
+        } else {
+          // Valor total
+          vipFromRenters += apt.price;
+        }
+      });
+    });
     
     // Receita das assinaturas VIP pagas (mensais/anuais)
     const vipSubscriptionRevenue = vipData.members
@@ -299,7 +371,7 @@ const AdminBarbershopRevenue = () => {
       }, 0);
     
     return vipFromNonRenters + vipFromRenters + vipSubscriptionRevenue;
-  }, [vipRevenues, getMonthAppointments, barbersWithChairRental, vipData]);
+  }, [vipRevenues, getMonthAppointments, barbersWith100PercentRental, barbersWith50PercentRental, vipData]);
 
   const chairRentalRevenue = useMemo(() => {
     let totalRental = 0;

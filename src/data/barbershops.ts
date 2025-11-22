@@ -9,6 +9,7 @@ export interface Barbershop {
   hours: string;
   isOpen: boolean;
   email: string;
+  pixKey: string;
   status?: BarbershopStatus;
   dataPagamento?: string;
   dataVencimento?: string;
@@ -24,6 +25,7 @@ export const DEFAULT_BARBERSHOPS: Barbershop[] = [
     hours: "Seg à Sáb • 09h às 21h",
     isOpen: true,
     email: "premium.center@barberbook.com",
+    pixKey: "",
     status: "disponivel",
   },
   {
@@ -35,6 +37,7 @@ export const DEFAULT_BARBERSHOPS: Barbershop[] = [
     hours: "Seg à Sáb • 10h às 20h",
     isOpen: true,
     email: "elite.jardins@barberbook.com",
+    pixKey: "",
     status: "disponivel",
   },
   {
@@ -46,6 +49,7 @@ export const DEFAULT_BARBERSHOPS: Barbershop[] = [
     hours: "Seg à Dom • 08h às 22h",
     isOpen: true,
     email: "studio.moema@barberbook.com",
+    pixKey: "",
     status: "disponivel",
   },
   {
@@ -57,6 +61,7 @@ export const DEFAULT_BARBERSHOPS: Barbershop[] = [
     hours: "Seg à Sáb • 09h às 19h",
     isOpen: false,
     email: "clube.alphaville@barberbook.com",
+    pixKey: "",
     status: "disponivel",
   },
   {
@@ -68,6 +73,7 @@ export const DEFAULT_BARBERSHOPS: Barbershop[] = [
     hours: "Seg à Dom • 08h às 21h",
     isOpen: true,
     email: "vila.olimpia@barberbook.com",
+    pixKey: "",
     status: "disponivel",
   },
   {
@@ -79,6 +85,7 @@ export const DEFAULT_BARBERSHOPS: Barbershop[] = [
     hours: "Seg à Sáb • 09h às 20h",
     isOpen: true,
     email: "concept.pinheiros@barberbook.com",
+    pixKey: "",
     status: "disponivel",
   },
 ];
