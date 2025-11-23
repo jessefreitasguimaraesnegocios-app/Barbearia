@@ -12,7 +12,7 @@ import { loadServices } from "@/lib/services-storage";
 import { loadCollaborators } from "@/lib/collaborators-storage";
 import { DEFAULT_SERVICES, ServiceItem } from "@/data/services";
 import { Collaborator } from "@/data/collaborators";
-import { format, startOfMonth, endOfMonth, startOfDay, endOfDay, startOfWeek, endOfWeek, parseISO, isWithinInterval } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfDay, endOfDay, startOfWeek, endOfWeek, parseISO, isWithinInterval, isPast } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { MouseEvent } from "react";
 
@@ -60,6 +60,42 @@ const AdminBookings = () => {
     payment: { fullName: string; phone: string; cpf: string };
   } | null>(null);
 
+  useEffect(() => {
+    const nextServices = loadServices();
+    setServices(nextServices);
+    
+    const loadedCollaborators = loadCollaborators();
+    setCollaborators(loadedCollaborators);
+    
+    const allStoredBookings: BookingConfirmation[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith("bookingConfirmation")) {
+        try {
+          const value = localStorage.getItem(key);
+          if (value) {
+            const parsed = JSON.parse(value);
+            if (parsed && parsed.appointments) {
+              if (Array.isArray(parsed)) {
+                allStoredBookings.push(...parsed.filter((b: BookingConfirmation) => b && b.appointments));
+              } else {
+                allStoredBookings.push(parsed);
+              }
+            }
+          }
+        } catch {
+          continue;
+        }
+      }
+    }
+    setAllBookings(allStoredBookings);
+  }, []);
+
+  const getBarberIdFromCollaborator = (collaborator: Collaborator): string => {
+    const nameSlug = collaborator.name.toLowerCase().replace(/\s+/g, "-");
+    return nameSlug;
+  };
+
   const loadBookings = () => {
     const allStoredBookings: BookingConfirmation[] = [];
     for (let i = 0; i < localStorage.length; i++) {
@@ -83,21 +119,6 @@ const AdminBookings = () => {
       }
     }
     return allStoredBookings;
-  };
-
-  useEffect(() => {
-    const nextServices = loadServices();
-    setServices(nextServices);
-    
-    const loadedCollaborators = loadCollaborators();
-    setCollaborators(loadedCollaborators);
-    
-    setAllBookings(loadBookings());
-  }, []);
-
-  const getBarberIdFromCollaborator = (collaborator: Collaborator): string => {
-    const nameSlug = collaborator.name.toLowerCase().replace(/\s+/g, "-");
-    return nameSlug;
   };
 
   const getFilteredAppointments = () => {
@@ -204,7 +225,7 @@ const AdminBookings = () => {
     });
   };
 
-  const filteredAppointments = useMemo(() => getFilteredAppointments(), [services, collaborators, periodFilter]);
+  const filteredAppointments = useMemo(() => getFilteredAppointments(), [allBookings, services, collaborators, periodFilter]);
 
   const getAppointmentsByDate = () => {
     const grouped = new Map<string, typeof filteredAppointments>();
@@ -251,6 +272,36 @@ const AdminBookings = () => {
       const bookingValue = localStorage.getItem(bookingKey);
       if (bookingValue) {
         const booking = JSON.parse(bookingValue) as BookingConfirmation;
+        const appointmentToCancel = booking.appointments.find((apt) => apt.id === aptId);
+        
+        if (!appointmentToCancel) {
+          toast({
+            variant: "destructive",
+            title: "Erro",
+            description: "Agendamento não encontrado.",
+          });
+          return;
+        }
+
+        // Verificar se o agendamento já passou
+        const aptDate = parseISO(appointmentToCancel.date);
+        const [hours, minutes] = appointmentToCancel.time.split(':').map(Number);
+        const aptDateTime = new Date(aptDate);
+        aptDateTime.setHours(hours, minutes, 0, 0);
+        
+        const isPastAppointment = isPast(aptDateTime);
+        
+        if (isPastAppointment) {
+          // Agendamento passado: não remover, apenas mostrar mensagem
+          toast({
+            title: "Agendamento não pode ser cancelado",
+            description: "Agendamentos passados não podem ser cancelados, pois já foram realizados e contam na receita.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Agendamento futuro: remover completamente
         const updatedAppointments = booking.appointments.filter((apt) => apt.id !== aptId);
         
         if (updatedAppointments.length === 0) {

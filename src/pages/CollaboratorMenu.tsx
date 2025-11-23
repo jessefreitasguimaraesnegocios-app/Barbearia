@@ -15,7 +15,7 @@ import { loadVipData } from "@/lib/vips-storage";
 import { VipMember } from "@/data/vips";
 import { Badge } from "@/components/ui/badge";
 import { User, Calendar, Clock, History, ChevronDown, Copy, Pencil, Eye, EyeOff, Trash2 } from "lucide-react";
-import { parseISO, isSameDay, isAfter, startOfToday, subMonths, format, eachDayOfInterval } from "date-fns";
+import { parseISO, isSameDay, isAfter, startOfToday, subMonths, format, eachDayOfInterval, isPast } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
 	AlertDialog,
@@ -236,7 +236,29 @@ const CollaboratorMenu = () => {
 					const bookingValue = localStorage.getItem(key);
 					if (bookingValue) {
 						const booking = JSON.parse(bookingValue) as BookingConfirmation;
-						if (booking.appointments.some((apt) => apt.id === aptId)) {
+						const appointmentToCancel = booking.appointments.find((apt) => apt.id === aptId);
+						
+						if (appointmentToCancel) {
+							// Verificar se o agendamento já passou
+							const aptDate = parseISO(appointmentToCancel.date);
+							const [hours, minutes] = appointmentToCancel.time.split(':').map(Number);
+							const aptDateTime = new Date(aptDate);
+							aptDateTime.setHours(hours, minutes, 0, 0);
+							const now = new Date();
+							
+							const isPastAppointment = isPast(aptDateTime);
+							
+							if (isPastAppointment) {
+								// Agendamento passado: não remover, apenas mostrar mensagem
+								toast({
+									title: "Agendamento não pode ser cancelado",
+									description: "Agendamentos passados não podem ser cancelados, pois já foram realizados e contam na receita.",
+									variant: "destructive",
+								});
+								return;
+							}
+
+							// Agendamento futuro: remover completamente
 							const updatedAppointments = booking.appointments.filter((apt) => apt.id !== aptId);
 							
 							if (updatedAppointments.length === 0) {
