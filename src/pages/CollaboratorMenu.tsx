@@ -14,7 +14,7 @@ import { ServiceItem } from "@/data/services";
 import { loadVipData } from "@/lib/vips-storage";
 import { VipMember } from "@/data/vips";
 import { Badge } from "@/components/ui/badge";
-import { User, Calendar, Clock, History, ChevronDown, Copy, Pencil, Eye, EyeOff } from "lucide-react";
+import { User, Calendar, Clock, History, ChevronDown, Copy, Pencil, Eye, EyeOff, Trash2 } from "lucide-react";
 import { parseISO, isSameDay, isAfter, startOfToday, subMonths, format, eachDayOfInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -22,6 +22,7 @@ import {
 	AlertDialogAction,
 	AlertDialogCancel,
 	AlertDialogContent,
+	AlertDialogDescription,
 	AlertDialogFooter,
 	AlertDialogHeader,
 	AlertDialogTitle,
@@ -200,7 +201,74 @@ const CollaboratorMenu = () => {
 			}
 		}
 		setAllBookings(allStoredBookings);
+	}, []);
 
+	const loadBookings = () => {
+		const allStoredBookings: BookingConfirmation[] = [];
+		for (let i = 0; i < localStorage.length; i++) {
+			const key = localStorage.key(i);
+			if (key && key.startsWith("bookingConfirmation")) {
+				try {
+					const value = localStorage.getItem(key);
+					if (value) {
+						const parsed = JSON.parse(value);
+						if (parsed && parsed.appointments) {
+							if (Array.isArray(parsed)) {
+								allStoredBookings.push(...parsed.filter((b: BookingConfirmation) => b && b.appointments));
+							} else {
+								allStoredBookings.push(parsed);
+							}
+						}
+					}
+				} catch {
+					continue;
+				}
+			}
+		}
+		return allStoredBookings;
+	};
+
+	const handleCancelAppointment = (aptId: string) => {
+		try {
+			for (let i = 0; i < localStorage.length; i++) {
+				const key = localStorage.key(i);
+				if (key && key.startsWith("bookingConfirmation")) {
+					const bookingValue = localStorage.getItem(key);
+					if (bookingValue) {
+						const booking = JSON.parse(bookingValue) as BookingConfirmation;
+						if (booking.appointments.some((apt) => apt.id === aptId)) {
+							const updatedAppointments = booking.appointments.filter((apt) => apt.id !== aptId);
+							
+							if (updatedAppointments.length === 0) {
+								localStorage.removeItem(key);
+							} else {
+								const updatedBooking = {
+									...booking,
+									appointments: updatedAppointments,
+								};
+								localStorage.setItem(key, JSON.stringify(updatedBooking));
+							}
+							
+							setAllBookings(loadBookings());
+							toast({
+								title: "Agendamento cancelado",
+								description: "O agendamento foi removido com sucesso.",
+							});
+							return;
+						}
+					}
+				}
+			}
+		} catch (error) {
+			toast({
+				variant: "destructive",
+				title: "Erro ao cancelar",
+				description: "Não foi possível cancelar o agendamento.",
+			});
+		}
+	};
+
+	useEffect(() => {
 		const handleStorage = (event: StorageEvent) => {
 			if (event.key?.startsWith("bookingConfirmation")) {
 				const updatedBookings: BookingConfirmation[] = [];
@@ -1144,20 +1212,22 @@ const CollaboratorMenu = () => {
 											return (
 											<div
 												key={`${item.appointment.id}-${idx}`}
-												className="flex items-center justify-between rounded-md border border-border px-4 py-3 hover:bg-secondary/50 transition-colors cursor-pointer"
-												onClick={() => {
-													if (booking && item.service) {
-														setSelectedAppointment({
-															apt: {
-																...item.appointment,
-																serviceName: item.service.title,
-															},
-															payment: booking.payment,
-														});
-													}
-												}}
+												className="flex items-center justify-between rounded-md border border-border px-4 py-3 hover:bg-secondary/50 transition-colors"
 											>
-												<div className="flex-1">
+												<div 
+													className="flex-1 cursor-pointer"
+													onClick={() => {
+														if (booking && item.service) {
+															setSelectedAppointment({
+																apt: {
+																	...item.appointment,
+																	serviceName: item.service.title,
+																},
+																payment: booking.payment,
+															});
+														}
+													}}
+												>
 													<div className="flex items-center gap-2 mb-1">
 														<User className="h-4 w-4 text-primary" />
 														<span className="font-medium">{item.clientName}</span>
@@ -1189,6 +1259,35 @@ const CollaboratorMenu = () => {
 														</div>
 													</div>
 												</div>
+												<AlertDialog>
+													<AlertDialogTrigger asChild>
+														<Button
+															variant="destructive"
+															size="icon"
+															className="h-8 w-8 ml-2"
+															onClick={(e) => e.stopPropagation()}
+														>
+															<Trash2 className="h-4 w-4" />
+														</Button>
+													</AlertDialogTrigger>
+													<AlertDialogContent>
+														<AlertDialogHeader>
+															<AlertDialogTitle>Cancelar Agendamento?</AlertDialogTitle>
+															<AlertDialogDescription>
+																Tem certeza que deseja cancelar este agendamento? Esta ação não pode ser desfeita.
+															</AlertDialogDescription>
+														</AlertDialogHeader>
+														<AlertDialogFooter>
+															<AlertDialogCancel>Cancelar</AlertDialogCancel>
+															<AlertDialogAction
+																onClick={() => handleCancelAppointment(item.appointment.id)}
+																className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+															>
+																Excluir
+															</AlertDialogAction>
+														</AlertDialogFooter>
+													</AlertDialogContent>
+												</AlertDialog>
 											</div>
 											);
 										})}

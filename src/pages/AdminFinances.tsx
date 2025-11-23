@@ -33,6 +33,8 @@ interface BookingConfirmation {
   };
   timestamp: string;
   barbershopId?: string;
+  isVip?: boolean;
+  vipMemberId?: string;
 }
 
 interface ShopSale {
@@ -202,9 +204,45 @@ const AdminFinances = () => {
     const startDate = startOfMonth(now);
     const endDate = endOfMonth(now);
     
+    const isClientVipAtBookingTime = (booking: BookingConfirmation): boolean => {
+      if (!booking.payment.fullName || !booking.payment.cpf || !booking.payment.phone) {
+        return false;
+      }
+
+      const normalizedName = booking.payment.fullName.toLowerCase().trim();
+      const normalizedCpf = booking.payment.cpf.replace(/\D/g, "");
+      const normalizedPhone = booking.payment.phone.replace(/\D/g, "");
+
+      const bookingDate = parseISO(booking.timestamp);
+      bookingDate.setHours(0, 0, 0, 0);
+
+      return vipData.members.some((member) => {
+        const memberName = member.name.toLowerCase().trim();
+        const memberCpf = member.cpf.replace(/\D/g, "");
+        const memberPhone = member.phone.replace(/\D/g, "");
+
+        const matches = 
+          memberName === normalizedName &&
+          memberCpf === normalizedCpf &&
+          memberPhone === normalizedPhone;
+
+        if (!matches) return false;
+
+        if (member.paymentStatus !== "paid") return false;
+
+        const expiresAt = new Date(member.expiresAt);
+        expiresAt.setHours(0, 0, 0, 0);
+
+        return expiresAt >= bookingDate;
+      });
+    };
+    
     const barbershopRevenue: Array<{ price: number; barberId: string; paymentMethod?: PaymentMethod }> = [];
     
     allBookings.forEach((booking) => {
+      const vipServiceFirstOccurrence = new Map<string, boolean>();
+      const isClientVip = isClientVipAtBookingTime(booking);
+      
       booking.appointments.forEach((apt) => {
         const aptDate = parseISO(apt.date);
         if (isWithinInterval(aptDate, { start: startDate, end: endDate })) {
@@ -215,11 +253,21 @@ const AdminFinances = () => {
               service.discountPercentage !== null &&
               service.discountPercentage > 0;
             
-            const price = hasDiscount && service.promotionScope === "vip"
-              ? service.price * (1 - (service.discountPercentage! / 100))
-              : hasDiscount
-                ? service.price * (1 - (service.discountPercentage! / 100))
-                : service.price;
+            const isVipService = service.promotionScope === "vip";
+            
+            let price = service.price;
+            if (hasDiscount) {
+              if (isVipService && isClientVip) {
+                const isFirst = !vipServiceFirstOccurrence.has(apt.serviceId);
+                vipServiceFirstOccurrence.set(apt.serviceId, true);
+                
+                if (isFirst) {
+                  price = service.price * (1 - (service.discountPercentage! / 100));
+                }
+              } else if (!isVipService) {
+                price = service.price * (1 - (service.discountPercentage! / 100));
+              }
+            }
             
             const collaborator = collaborators.find((c) => 
               c.id === apt.barberId || getBarberIdFromCollaborator(c) === apt.barberId
@@ -243,7 +291,7 @@ const AdminFinances = () => {
     return { barbershopRevenue, shopRevenue };
   };
 
-  const { barbershopRevenue, shopRevenue } = useMemo(() => getMonthData(), [allBookings, services, collaborators, shopSales]);
+  const { barbershopRevenue, shopRevenue } = useMemo(() => getMonthData(), [allBookings, services, collaborators, shopSales, vipData]);
 
   const chairRentalRevenue = useMemo(() => {
     let totalRental = 0;

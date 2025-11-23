@@ -56,6 +56,7 @@ interface BarberRevenue {
   totalRevenue: number;
   appointments: AppointmentRevenue[];
   appointmentCount: number;
+  paymentMethod?: PaymentMethod;
 }
 
 interface VipRevenue {
@@ -140,9 +141,42 @@ const AdminBarbershopRevenue = () => {
     
     const appointments: AppointmentRevenue[] = [];
     
+    const isClientVipAtBookingTime = (booking: BookingConfirmation): boolean => {
+      if (!booking.payment.fullName || !booking.payment.cpf || !booking.payment.phone) {
+        return false;
+      }
+
+      const normalizedName = booking.payment.fullName.toLowerCase().trim();
+      const normalizedCpf = booking.payment.cpf.replace(/\D/g, "");
+      const normalizedPhone = booking.payment.phone.replace(/\D/g, "");
+
+      const bookingDate = parseISO(booking.timestamp);
+      bookingDate.setHours(0, 0, 0, 0);
+
+      return vipData.members.some((member) => {
+        const memberName = member.name.toLowerCase().trim();
+        const memberCpf = member.cpf.replace(/\D/g, "");
+        const memberPhone = member.phone.replace(/\D/g, "");
+
+        const matches = 
+          memberName === normalizedName &&
+          memberCpf === normalizedCpf &&
+          memberPhone === normalizedPhone;
+
+        if (!matches) return false;
+
+        if (member.paymentStatus !== "paid") return false;
+
+        const expiresAt = new Date(member.expiresAt);
+        expiresAt.setHours(0, 0, 0, 0);
+
+        return expiresAt >= bookingDate;
+      });
+    };
+    
     allBookings.forEach((booking) => {
       const vipServiceFirstOccurrence = new Map<string, boolean>();
-      const isClientVip = booking.isVip === true;
+      const isClientVip = isClientVipAtBookingTime(booking);
       
       booking.appointments.forEach((apt) => {
         const aptDate = parseISO(apt.date);
@@ -194,19 +228,24 @@ const AdminBarbershopRevenue = () => {
     });
     
     return appointments;
-  }, [allBookings, services, collaborators]);
+  }, [allBookings, services, collaborators, vipData, currentMonth]);
 
   const barberRevenues = useMemo(() => {
     const barberMap = new Map<string, BarberRevenue>();
     
     getMonthAppointments.forEach((apt) => {
       if (!barberMap.has(apt.barberId)) {
+        const collaborator = collaborators.find((c) => 
+          c.id === apt.barberId || getBarberIdFromCollaborator(c) === apt.barberId
+        );
+        
         barberMap.set(apt.barberId, {
           barberId: apt.barberId,
           barberName: apt.barberName,
           totalRevenue: 0,
           appointments: [],
           appointmentCount: 0,
+          paymentMethod: collaborator?.paymentMethod,
         });
       }
       
@@ -217,7 +256,7 @@ const AdminBarbershopRevenue = () => {
     });
     
     return Array.from(barberMap.values()).sort((a, b) => b.totalRevenue - a.totalRevenue);
-  }, [getMonthAppointments]);
+  }, [getMonthAppointments, collaborators]);
 
   const vipRevenues = useMemo(() => {
     const vipMap = new Map<string, VipRevenue>();
@@ -494,12 +533,35 @@ const AdminBarbershopRevenue = () => {
                   </p>
                 ) : (
                   <>
-                    {barberRevenues.map((barber) => (
+                    {barberRevenues.map((barber) => {
+                      const getPaymentIndicator = () => {
+                        if (!barber.paymentMethod) return null;
+                        
+                        const is100Percent = barber.paymentMethod === "aluguel-cadeira-100" || 
+                                            barber.paymentMethod === "recebe-100-por-cliente";
+                        const is50Percent = barber.paymentMethod === "aluguel-cadeira-50" || 
+                                          barber.paymentMethod === "recebe-50-por-cliente";
+                        const isSalary = barber.paymentMethod === "salario-fixo";
+                        
+                        if (is100Percent) return "100%";
+                        if (is50Percent) return "50%";
+                        if (isSalary) return "$";
+                        return null;
+                      };
+                      
+                      const paymentIndicator = getPaymentIndicator();
+                      
+                      return (
                       <div key={barber.barberId} className="p-4 bg-secondary/50 rounded-lg">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2 flex-1">
                             <User className="h-4 w-4 text-primary flex-shrink-0" />
                             <span className="font-semibold">{barber.barberName}</span>
+                            {paymentIndicator && (
+                              <Badge variant="outline" className="text-xs">
+                                {paymentIndicator}
+                              </Badge>
+                            )}
                           </div>
                           <span className="text-lg font-bold text-primary ml-2">
                             {currencyFormatter.format(barber.totalRevenue)}
@@ -537,7 +599,8 @@ const AdminBarbershopRevenue = () => {
                           )}
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                     <div className="pt-4 border-t border-border">
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-lg">Total</span>

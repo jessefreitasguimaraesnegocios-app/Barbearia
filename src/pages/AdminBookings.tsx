@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Calendar, Clock, User, DollarSign, Filter, Copy } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, User, DollarSign, Filter, Copy, Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { loadServices } from "@/lib/services-storage";
 import { loadCollaborators } from "@/lib/collaborators-storage";
 import { DEFAULT_SERVICES, ServiceItem } from "@/data/services";
@@ -59,13 +60,7 @@ const AdminBookings = () => {
     payment: { fullName: string; phone: string; cpf: string };
   } | null>(null);
 
-  useEffect(() => {
-    const nextServices = loadServices();
-    setServices(nextServices);
-    
-    const loadedCollaborators = loadCollaborators();
-    setCollaborators(loadedCollaborators);
-    
+  const loadBookings = () => {
     const allStoredBookings: BookingConfirmation[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
@@ -87,7 +82,17 @@ const AdminBookings = () => {
         }
       }
     }
-    setAllBookings(allStoredBookings);
+    return allStoredBookings;
+  };
+
+  useEffect(() => {
+    const nextServices = loadServices();
+    setServices(nextServices);
+    
+    const loadedCollaborators = loadCollaborators();
+    setCollaborators(loadedCollaborators);
+    
+    setAllBookings(loadBookings());
   }, []);
 
   const getBarberIdFromCollaborator = (collaborator: Collaborator): string => {
@@ -125,66 +130,81 @@ const AdminBookings = () => {
       price: number;
       dateObj: Date;
       bookingPayment: { fullName: string; phone: string; cpf: string };
+      bookingKey: string;
     }> = [];
     
-    allBookings.forEach((booking) => {
-      const vipServiceFirstOccurrence = new Map<string, boolean>();
-      const isClientVip = booking.isVip === true;
-      
-      booking.appointments.forEach((apt) => {
-        const aptDate = parseISO(apt.date);
-        if (isWithinInterval(aptDate, { start: startDate, end: endDate })) {
-          const service = services.find((s) => s.id === apt.serviceId);
-          const collaborator = collaborators.find((c) => 
-            c.id === apt.barberId || getBarberIdFromCollaborator(c) === apt.barberId
-          );
-          
-          if (service) {
-            const hasDiscount =
-              service.promotionScope !== "none" &&
-              service.discountPercentage !== null &&
-              service.discountPercentage > 0;
-            
-            const isVipService = service.promotionScope === "vip";
-            
-            let price = service.price;
-            if (hasDiscount) {
-              if (isVipService && isClientVip) {
-                // Para serviços VIP, aplicar desconto apenas na primeira vez que o serviço aparece no booking
-                const isFirst = !vipServiceFirstOccurrence.has(apt.serviceId);
-                vipServiceFirstOccurrence.set(apt.serviceId, true);
-                
-                if (isFirst) {
-                  price = service.price * (1 - (service.discountPercentage! / 100));
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith("bookingConfirmation")) {
+        try {
+          const value = localStorage.getItem(key);
+          if (value) {
+            const booking = JSON.parse(value) as BookingConfirmation;
+            if (booking && booking.appointments) {
+              const vipServiceFirstOccurrence = new Map<string, boolean>();
+              const isClientVip = booking.isVip === true;
+              
+              booking.appointments.forEach((apt) => {
+                const aptDate = parseISO(apt.date);
+                if (isWithinInterval(aptDate, { start: startDate, end: endDate })) {
+                  const service = services.find((s) => s.id === apt.serviceId);
+                  const collaborator = collaborators.find((c) => 
+                    c.id === apt.barberId || getBarberIdFromCollaborator(c) === apt.barberId
+                  );
+                  
+                  if (service) {
+                    const hasDiscount =
+                      service.promotionScope !== "none" &&
+                      service.discountPercentage !== null &&
+                      service.discountPercentage > 0;
+                    
+                    const isVipService = service.promotionScope === "vip";
+                    
+                    let price = service.price;
+                    if (hasDiscount) {
+                      if (isVipService && isClientVip) {
+                        // Para serviços VIP, aplicar desconto apenas na primeira vez que o serviço aparece no booking
+                        const isFirst = !vipServiceFirstOccurrence.has(apt.serviceId);
+                        vipServiceFirstOccurrence.set(apt.serviceId, true);
+                        
+                        if (isFirst) {
+                          price = service.price * (1 - (service.discountPercentage! / 100));
+                        }
+                      } else if (!isVipService) {
+                        // Para serviços não VIP, aplicar desconto normalmente
+                        price = service.price * (1 - (service.discountPercentage! / 100));
+                      }
+                    }
+                    
+                    appointments.push({
+                      ...apt,
+                      clientName: apt.clientName || booking.payment.fullName,
+                      serviceName: service.title,
+                      barberName: collaborator?.name || apt.barberId,
+                      price,
+                      dateObj: aptDate,
+                      bookingPayment: booking.payment,
+                      bookingKey: key,
+                    });
+                  }
                 }
-              } else if (!isVipService) {
-                // Para serviços não VIP, aplicar desconto normalmente
-                price = service.price * (1 - (service.discountPercentage! / 100));
-              }
+              });
             }
-            
-            appointments.push({
-              ...apt,
-              clientName: apt.clientName || booking.payment.fullName,
-              serviceName: service.title,
-              barberName: collaborator?.name || apt.barberId,
-              price,
-              dateObj: aptDate,
-              bookingPayment: booking.payment,
-            });
           }
+        } catch {
+          continue;
         }
-      });
-    });
+      }
+    }
     
     return appointments.sort((a, b) => {
-      const dateCompare = a.dateObj.getTime() - b.dateObj.getTime();
+      const dateCompare = b.dateObj.getTime() - a.dateObj.getTime();
       if (dateCompare !== 0) return dateCompare;
-      return a.time.localeCompare(b.time);
+      return b.time.localeCompare(a.time);
     });
   };
 
-  const filteredAppointments = useMemo(() => getFilteredAppointments(), [allBookings, services, collaborators, periodFilter]);
+  const filteredAppointments = useMemo(() => getFilteredAppointments(), [services, collaborators, periodFilter]);
 
   const getAppointmentsByDate = () => {
     const grouped = new Map<string, typeof filteredAppointments>();
@@ -200,8 +220,12 @@ const AdminBookings = () => {
     return Array.from(grouped.entries()).map(([date, apts]) => ({
       date,
       dateObj: parseISO(date),
-      appointments: apts,
-    })).sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
+      appointments: apts.sort((a, b) => {
+        const dateCompare = b.dateObj.getTime() - a.dateObj.getTime();
+        if (dateCompare !== 0) return dateCompare;
+        return b.time.localeCompare(a.time);
+      }),
+    })).sort((a, b) => b.dateObj.getTime() - a.dateObj.getTime());
   };
 
   const appointmentsByDate = useMemo(() => getAppointmentsByDate(), [filteredAppointments]);
@@ -220,6 +244,38 @@ const AdminBookings = () => {
     const currentIndex = periods.indexOf(periodFilter);
     const nextIndex = (currentIndex + 1) % periods.length;
     setPeriodFilter(periods[nextIndex]);
+  };
+
+  const handleCancelAppointment = (aptId: string, bookingKey: string) => {
+    try {
+      const bookingValue = localStorage.getItem(bookingKey);
+      if (bookingValue) {
+        const booking = JSON.parse(bookingValue) as BookingConfirmation;
+        const updatedAppointments = booking.appointments.filter((apt) => apt.id !== aptId);
+        
+        if (updatedAppointments.length === 0) {
+          localStorage.removeItem(bookingKey);
+        } else {
+          const updatedBooking = {
+            ...booking,
+            appointments: updatedAppointments,
+          };
+          localStorage.setItem(bookingKey, JSON.stringify(updatedBooking));
+        }
+        
+        setAllBookings(loadBookings());
+        toast({
+          title: "Agendamento cancelado",
+          description: "O agendamento foi removido com sucesso.",
+        });
+      }
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Erro ao cancelar",
+        description: "Não foi possível cancelar o agendamento.",
+      });
+    }
   };
 
   const getPeriodLabel = () => {
@@ -414,11 +470,13 @@ const AdminBookings = () => {
                       {appointments.map((apt) => (
                         <div
                           key={apt.id}
-                          onClick={() => setSelectedAppointment({ apt, payment: apt.bookingPayment })}
-                          className="p-4 border border-border rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
+                          className="p-4 border border-border rounded-lg hover:bg-secondary/50 transition-colors"
                         >
                           <div className="flex items-start justify-between">
-                            <div className="flex-1">
+                            <div 
+                              className="flex-1 cursor-pointer"
+                              onClick={() => setSelectedAppointment({ apt, payment: apt.bookingPayment })}
+                            >
                               <div className="flex items-center gap-2 mb-2">
                                 <User className="h-4 w-4 text-primary" />
                                 <span className="font-semibold">{apt.clientName}</span>
@@ -433,14 +491,45 @@ const AdminBookings = () => {
                                 </p>
                               </div>
                             </div>
-                            <div className="text-right space-y-1">
-                              <div className="flex items-center gap-1 text-primary font-semibold">
-                                <Clock className="h-4 w-4" />
-                                {apt.time}
+                            <div className="flex items-start gap-3">
+                              <div className="text-right space-y-1">
+                                <div className="flex items-center gap-1 text-primary font-semibold">
+                                  <Clock className="h-4 w-4" />
+                                  {apt.time}
+                                </div>
+                                <div className="text-sm font-medium text-primary">
+                                  {currencyFormatter.format(apt.price)}
+                                </div>
                               </div>
-                              <div className="text-sm font-medium text-primary">
-                                {currencyFormatter.format(apt.price)}
-                              </div>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    variant="destructive"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Cancelar Agendamento?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Tem certeza que deseja cancelar este agendamento? Esta ação não pode ser desfeita.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleCancelAppointment(apt.id, apt.bookingKey)}
+                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    >
+                                      Excluir
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
                             </div>
                           </div>
                         </div>

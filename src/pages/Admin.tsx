@@ -798,56 +798,6 @@ const Admin = () => {
             ))}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Recent Bookings */}
-            <Card className="shadow-card border-border">
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Calendar className="h-5 w-5 mr-2 text-primary" />
-                  Próximos Agendamentos
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {todayAppointments.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-4">
-                      Nenhum agendamento para hoje
-                    </p>
-                  ) : (
-                    todayAppointments.map((booking, index) => (
-                    <div 
-                      key={index} 
-                      className="flex items-center justify-between p-4 bg-secondary rounded-lg cursor-pointer hover:bg-secondary/80 transition-colors"
-                      onClick={() => {
-                        setSelectedAppointment({
-                          apt: {
-                            serviceName: booking.service,
-                            clientName: booking.client,
-                            date: booking.date,
-                            time: booking.time,
-                            barber: booking.barber,
-                          },
-                          payment: booking.booking.payment,
-                        });
-                      }}
-                    >
-                      <div>
-                        <div className="font-semibold">{booking.client}</div>
-                        <div className="text-sm text-muted-foreground">{booking.service}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="flex items-center text-primary font-semibold">
-                          <Clock className="h-4 w-4 mr-1" />
-                          {booking.time}
-                        </div>
-                        <div className="text-sm text-muted-foreground">{booking.barber}</div>
-                      </div>
-                    </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
 
             {/* Quick Actions */}
             <Card className="shadow-card border-border">

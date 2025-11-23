@@ -117,7 +117,7 @@ const AdminCollaborators = () => {
         role: selectedCollaborator.role,
         specialty: selectedCollaborator.specialty || "",
         password: "",
-        paymentMethod: selectedCollaborator.paymentMethod || "",
+        paymentMethod: selectedCollaborator.paymentMethod ? (selectedCollaborator.paymentMethod as PaymentMethod) : "",
         photoUrl: selectedCollaborator.photoUrl || "",
         experience: selectedCollaborator.experience || "",
         workSchedule: selectedCollaborator.workSchedule || "",
@@ -240,7 +240,7 @@ const AdminCollaborators = () => {
                 role: formState.role,
                 specialty: formState.specialty.trim(),
                 password: applyPassword(collaborator.password),
-                paymentMethod: formState.paymentMethod || undefined,
+                paymentMethod: formState.paymentMethod ? (formState.paymentMethod as PaymentMethod) : undefined,
                 photoUrl: formState.photoUrl.trim() || undefined,
                 experience: formState.experience.trim() || undefined,
                 workSchedule: formState.workSchedule.trim() || undefined,
@@ -610,7 +610,7 @@ const AdminCollaborators = () => {
                     <div className="space-y-2">
                       <Label htmlFor="collaborator-payment-method">Forma de Pagamento</Label>
                       <Select
-                        value={formState.paymentMethod || undefined}
+                        value={formState.paymentMethod ? formState.paymentMethod : undefined}
                         onValueChange={(value) => handleInputChange("paymentMethod", value as PaymentMethod | "")}
                       >
                         <SelectTrigger id="collaborator-payment-method">
