@@ -20,6 +20,7 @@ import AdminServices from "./pages/AdminServices";
 import AdminProfile from "./pages/AdminProfile";
 import AdminCollaborators from "./pages/AdminCollaborators";
 import CollaboratorDetails from "./pages/CollaboratorDetails";
+import CollaboratorTimeSheet from "./pages/CollaboratorTimeSheet";
 import AdminVip from "./pages/AdminVip";
 import AdminInventory from "./pages/AdminInventory";
 import AdminShop from "./pages/AdminShop";
@@ -60,6 +61,7 @@ const App = () => (
               <Route path="/admin/perfil" element={<RequireAdmin><AdminProfile /></RequireAdmin>} />
               <Route path="/admin/colaboradores" element={<RequireAdmin><AdminCollaborators /></RequireAdmin>} />
               <Route path="/admin/colaboradores/:id" element={<RequireAdmin><CollaboratorDetails /></RequireAdmin>} />
+              <Route path="/admin/colaboradores/:id/folha-ponto" element={<RequireAdmin><CollaboratorTimeSheet /></RequireAdmin>} />
               <Route path="/admin/vips" element={<RequireAdmin><AdminVip /></RequireAdmin>} />
               <Route path="/admin/estoque" element={<RequireAdmin><AdminInventory /></RequireAdmin>} />
               <Route path="/admin/loja" element={<RequireAdmin><AdminShop /></RequireAdmin>} />

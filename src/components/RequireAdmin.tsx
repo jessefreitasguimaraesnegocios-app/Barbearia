@@ -12,7 +12,7 @@ const RequireAdmin = ({ children }: Props) => {
 		const stored = localStorage.getItem("activeCollaborator");
 		if (stored) {
 			const parsed = JSON.parse(stored) as { role?: string };
-			isAdmin = parsed.role === "socio";
+			isAdmin = parsed.role === "socio" || parsed.role === "dono";
 		}
 	} catch {
 		isAdmin = false;

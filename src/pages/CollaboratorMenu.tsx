@@ -123,6 +123,7 @@ const CollaboratorMenu = () => {
 	} | null>(null);
 	const [showPassword, setShowPassword] = useState(false);
 	const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+	const [selectedBarbershop, setSelectedBarbershop] = useState<{ id: number; name: string; email: string } | null>(null);
 
 	const storageKey = useMemo(() => {
 		return active ? `time_clock_${active.id}_${todayKey()}` : "";
@@ -150,6 +151,22 @@ const CollaboratorMenu = () => {
 					password: "",
 					confirmPassword: "",
 				});
+			}
+		}
+
+		const storedBarbershop = localStorage.getItem("selectedBarbershop");
+		if (storedBarbershop) {
+			try {
+				const parsed = JSON.parse(storedBarbershop) as { id: number; name: string; email?: string };
+				if (parsed?.id && parsed?.name) {
+					setSelectedBarbershop({
+						id: parsed.id,
+						name: parsed.name,
+						email: parsed.email || "",
+					});
+				}
+			} catch {
+				// Ignore parsing errors
 			}
 		}
 	}, [active]);
@@ -728,7 +745,18 @@ const CollaboratorMenu = () => {
 		<div className="min-h-screen bg-background">
 			<Navbar />
 			<main className="pt-24 pb-20">
-				<div className="container mx-auto px-4 grid gap-6 md:grid-cols-2">
+				<div className="container mx-auto px-4">
+					{selectedBarbershop && (
+						<div className="mb-8 text-center">
+							<span className="relative inline-flex items-center px-6 py-3 rounded-xl text-2xl md:text-3xl font-display font-bold bg-gradient-to-r from-primary/25 via-primary/35 to-primary/25 text-primary border-2 border-primary/50 shadow-lg shadow-primary/30 hover:shadow-xl hover:shadow-primary/50 transition-all duration-500 hover:scale-110 hover:border-primary/70 backdrop-blur-sm group">
+								<span className="absolute inset-0 rounded-xl bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></span>
+								<span className="relative z-10 drop-shadow-lg filter">
+									{selectedBarbershop.name}
+								</span>
+							</span>
+						</div>
+					)}
+					<div className="grid gap-6 md:grid-cols-2">
 					<Card className="shadow-card border-border">
 						<CardHeader>
 							<div className="flex items-center justify-between">
@@ -1318,6 +1346,7 @@ const CollaboratorMenu = () => {
 							})()}
 						</CardContent>
 					</Card>
+					</div>
 
 					<Dialog open={!!selectedAppointment} onOpenChange={(open) => !open && setSelectedAppointment(null)}>
 						<DialogContent className="sm:max-w-md">

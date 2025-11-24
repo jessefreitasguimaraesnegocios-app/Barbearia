@@ -758,8 +758,11 @@ const Admin = () => {
                 Visão geral da
               </p>
               {activeBarbershop?.name ? (
-                <span className="inline-flex items-center px-4 py-1.5 rounded-lg text-2xl md:text-3xl font-display font-bold bg-gradient-to-r from-primary/10 via-primary/15 to-primary/10 text-primary border border-primary/20 shadow-gold/30 hover:shadow-gold/50 transition-all duration-300 hover:scale-105">
-                  {activeBarbershop.name}
+                <span className="relative inline-flex items-center px-6 py-3 rounded-xl text-2xl md:text-3xl font-display font-bold bg-gradient-to-r from-primary/25 via-primary/35 to-primary/25 text-primary border-2 border-primary/50 shadow-lg shadow-primary/30 hover:shadow-xl hover:shadow-primary/50 transition-all duration-500 hover:scale-110 hover:border-primary/70 backdrop-blur-sm group">
+                  <span className="absolute inset-0 rounded-xl bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></span>
+                  <span className="relative z-10 drop-shadow-lg filter">
+                    {activeBarbershop.name}
+                  </span>
                 </span>
               ) : (
                 <span className="text-lg text-muted-foreground">sua barbearia</span>

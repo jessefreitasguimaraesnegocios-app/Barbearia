@@ -100,7 +100,7 @@ export const Navbar = () => {
             {/* Desktop CTA */}
             <div className="hidden md:flex items-center space-x-4">
               <ThemeToggle />
-              {activeCollaborator?.role === "socio" ? (
+              {(activeCollaborator?.role === "socio" || activeCollaborator?.role === "dono") ? (
                 <Link to="/admin">
                   <Button variant="ghost" size="sm">
                     <LayoutDashboard className="h-4 w-4 mr-2" />
@@ -154,7 +154,7 @@ export const Navbar = () => {
               ))}
               <div className="px-4 pt-3 space-y-2 border-t border-border">
                 <ThemeToggle />
-                {activeCollaborator?.role === "socio" && (
+                {(activeCollaborator?.role === "socio" || activeCollaborator?.role === "dono") && (
                   <Link to="/admin" onClick={() => setIsOpen(false)}>
                     <Button variant="ghost" className="w-full justify-start">
                       <LayoutDashboard className="h-4 w-4 mr-2" />
@@ -162,7 +162,7 @@ export const Navbar = () => {
                     </Button>
                   </Link>
                 )}
-                {activeCollaborator && activeCollaborator.role !== "socio" && (
+                {activeCollaborator && activeCollaborator.role !== "socio" && activeCollaborator.role !== "dono" && (
                   <Link to="/menu" onClick={() => setIsOpen(false)}>
                     <Button variant="ghost" className="w-full justify-start">
                       <LayoutDashboard className="h-4 w-4 mr-2" />

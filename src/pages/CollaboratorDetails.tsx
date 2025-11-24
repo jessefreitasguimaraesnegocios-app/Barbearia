@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
-import { ArrowLeft, User, Mail, Phone, Calendar, Clock, DollarSign, TrendingUp, UserCircle, Copy } from "lucide-react";
+import { ArrowLeft, User, Mail, Phone, Calendar, Clock, DollarSign, TrendingUp, UserCircle, Copy, FileText } from "lucide-react";
 import { loadCollaborators } from "@/lib/collaborators-storage";
 import { COLLABORATOR_ROLES } from "@/data/collaborators";
 import { loadServices } from "@/lib/services-storage";
@@ -378,13 +378,21 @@ const CollaboratorDetails = () => {
                 </Card>
               </div>
 
-              <div className="flex justify-center">
+              <div className="flex justify-center gap-4 flex-wrap">
                 <Button
                   variant="hero"
                   onClick={() => setShowProfile(true)}
                   className="w-full md:w-auto"
                 >
                   Ver Perfil Completo
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => navigate(`/admin/colaboradores/${id}/folha-ponto`)}
+                  className="w-full md:w-auto"
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Folha de Ponto
                 </Button>
               </div>
             </>
