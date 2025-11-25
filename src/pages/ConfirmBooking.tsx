@@ -6,10 +6,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Calendar as CalendarIcon, Clock, User, Check, ArrowLeft, Crown } from "lucide-react";
 import { DEFAULT_SERVICES, ServiceItem } from "@/data/services";
 import { loadServices } from "@/lib/services-storage";
 import { loadVipData, VipMember } from "@/lib/vips-storage";
+import { PaymentScreen } from "@/components/pix/PaymentScreen";
+import { SuccessScreen } from "@/components/pix/SuccessScreen";
+import { generatePixCode } from "@/services/pixService";
+import { PixPaymentState, GeneratedPix } from "@/types/pix";
+import { loadBarbershops } from "@/lib/barbershops-storage";
+import { useToast } from "@/components/ui/use-toast";
 
 interface Appointment {
   id: string;
@@ -52,6 +59,7 @@ const barbers = [
 const ConfirmBooking = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { toast } = useToast();
   const [services, setServices] = useState<ServiceItem[]>(DEFAULT_SERVICES);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [paymentData, setPaymentData] = useState<PaymentData>({
@@ -60,6 +68,10 @@ const ConfirmBooking = () => {
     cpf: "",
   });
   const [vipMembers, setVipMembers] = useState<VipMember[]>([]);
+  const [pixState, setPixState] = useState<PixPaymentState>(PixPaymentState.FORM);
+  const [currentPix, setCurrentPix] = useState<GeneratedPix | null>(null);
+  const [pixDialogOpen, setPixDialogOpen] = useState(false);
+  const [selectedBarbershop, setSelectedBarbershop] = useState<{ id: string; name: string; pixKey: string } | null>(null);
 
   useEffect(() => {
     const nextServices = loadServices();
@@ -82,6 +94,27 @@ const ConfirmBooking = () => {
       }
     } else {
       navigate("/booking");
+    }
+
+    const storedBarbershop = localStorage.getItem("selectedBarbershop");
+    if (storedBarbershop) {
+      try {
+        const parsed = JSON.parse(storedBarbershop) as { id: string | number; name: string; email?: string };
+        const barbershops = loadBarbershops();
+        const barbershop = barbershops.find(bs => 
+          bs.id === parsed.id.toString() || bs.id === parsed.id
+        );
+        
+        if (barbershop && barbershop.pixKey) {
+          setSelectedBarbershop({
+            id: barbershop.id,
+            name: barbershop.name,
+            pixKey: barbershop.pixKey,
+          });
+        }
+      } catch {
+        // Ignore parsing errors
+      }
     }
   }, [navigate]);
 
@@ -157,41 +190,84 @@ const ConfirmBooking = () => {
   };
 
   const handlePayment = () => {
-    if (isPaymentFormValid() && areAllClientNamesFilled()) {
-      const storedBarbershop = localStorage.getItem("selectedBarbershop");
-      let barbershopId: string | null = null;
-      
-      if (storedBarbershop) {
-        try {
-          const parsed = JSON.parse(storedBarbershop) as { id?: string | number };
-          if (parsed.id) {
-            barbershopId = typeof parsed.id === "number" ? parsed.id.toString() : parsed.id;
-          }
-        } catch {
-          // Ignore parsing errors
-        }
-      }
-      
-      const bookingData = {
-        appointments: appointments.map((apt) => ({
-          ...apt,
-          date: apt.date.toISOString(),
-          clientName: apt.clientName || paymentData.fullName || undefined,
-        })),
-        payment: paymentData,
-        timestamp: new Date().toISOString(),
-        barbershopId: barbershopId || undefined,
-        isVip: isVipClient !== null,
-        vipMemberId: isVipClient?.id,
-      };
-      
-      const bookingKey = `bookingConfirmation_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
-      localStorage.setItem(bookingKey, JSON.stringify(bookingData));
-      
-      alert("Agendamento confirmado com sucesso!");
-      localStorage.removeItem("bookingAppointments");
-      navigate("/");
+    if (!isPaymentFormValid() || !areAllClientNamesFilled()) {
+      return;
     }
+
+    if (!selectedBarbershop || !selectedBarbershop.pixKey) {
+      toast({
+        variant: "destructive",
+        title: "Chave PIX não configurada",
+        description: "A barbearia selecionada não possui chave PIX configurada. Configure no painel administrativo.",
+      });
+      return;
+    }
+
+    const total = calculateTotal();
+    const amount = total.toFixed(2).replace('.', ',');
+    const pixData = {
+      key: selectedBarbershop.pixKey,
+      amount: amount,
+      name: selectedBarbershop.name,
+      city: "São Paulo",
+      txId: `AGENDAMENTO-${Date.now()}`,
+    };
+
+    const payload = generatePixCode(pixData);
+    
+    setCurrentPix({
+      payload,
+      data: pixData,
+    });
+    
+    setPixState(PixPaymentState.PAYMENT);
+    setPixDialogOpen(true);
+  };
+
+  const handlePaymentConfirm = () => {
+    const storedBarbershop = localStorage.getItem("selectedBarbershop");
+    let barbershopId: string | null = null;
+    
+    if (storedBarbershop) {
+      try {
+        const parsed = JSON.parse(storedBarbershop) as { id?: string | number };
+        if (parsed.id) {
+          barbershopId = typeof parsed.id === "number" ? parsed.id.toString() : parsed.id;
+        }
+      } catch {
+        // Ignore parsing errors
+      }
+    }
+    
+    const bookingData = {
+      appointments: appointments.map((apt) => ({
+        ...apt,
+        date: apt.date.toISOString(),
+        clientName: apt.clientName || paymentData.fullName || undefined,
+      })),
+      payment: paymentData,
+      timestamp: new Date().toISOString(),
+      barbershopId: barbershopId || undefined,
+      isVip: isVipClient !== null,
+      vipMemberId: isVipClient?.id,
+    };
+    
+    const bookingKey = `bookingConfirmation_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+    localStorage.setItem(bookingKey, JSON.stringify(bookingData));
+    
+    setPixState(PixPaymentState.SUCCESS);
+    localStorage.removeItem("bookingAppointments");
+  };
+
+  const handlePixReset = () => {
+    setPixState(PixPaymentState.FORM);
+    setCurrentPix(null);
+    setPixDialogOpen(false);
+    navigate("/");
+  };
+
+  const handleBackToForm = () => {
+    setPixState(PixPaymentState.PAYMENT);
   };
 
   const currencyFormatter = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -469,6 +545,25 @@ const ConfirmBooking = () => {
       </main>
 
       <Footer />
+
+      <Dialog open={pixDialogOpen} onOpenChange={setPixDialogOpen}>
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+          {pixState === PixPaymentState.PAYMENT && currentPix && (
+            <PaymentScreen 
+              data={currentPix} 
+              onConfirm={handlePaymentConfirm}
+              onBack={handleBackToForm}
+            />
+          )}
+
+          {pixState === PixPaymentState.SUCCESS && currentPix && (
+            <SuccessScreen 
+              amount={currentPix.data.amount} 
+              onReset={handlePixReset} 
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

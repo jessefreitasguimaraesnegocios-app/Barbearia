@@ -8,13 +8,48 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useCart } from "@/context/CartContext";
 import { Trash2, ShoppingBag, Plus, Minus } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { PaymentScreen } from "@/components/pix/PaymentScreen";
+import { SuccessScreen } from "@/components/pix/SuccessScreen";
+import { generatePixCode } from "@/services/pixService";
+import { PixPaymentState, GeneratedPix } from "@/types/pix";
+import { loadBarbershops } from "@/lib/barbershops-storage";
+import { useToast } from "@/components/ui/use-toast";
 
 const Cart = () => {
   const { items, removeItem, updateQuantity, clearCart, totalValue } = useCart();
+  const [pixState, setPixState] = useState<PixPaymentState>(PixPaymentState.FORM);
+  const [currentPix, setCurrentPix] = useState<GeneratedPix | null>(null);
+  const [pixDialogOpen, setPixDialogOpen] = useState(false);
+  const [selectedBarbershop, setSelectedBarbershop] = useState<{ id: string; name: string; pixKey: string } | null>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const storedBarbershop = localStorage.getItem("selectedBarbershop");
+    if (storedBarbershop) {
+      try {
+        const parsed = JSON.parse(storedBarbershop) as { id: string | number; name: string; email?: string };
+        const barbershops = loadBarbershops();
+        const barbershop = barbershops.find(bs => 
+          bs.id === parsed.id.toString() || bs.id === parsed.id
+        );
+        
+        if (barbershop && barbershop.pixKey) {
+          setSelectedBarbershop({
+            id: barbershop.id,
+            name: barbershop.name,
+            pixKey: barbershop.pixKey,
+          });
+        }
+      } catch {
+        // Ignore parsing errors
+      }
+    }
+  }, []);
 
   const formattedTotal = useMemo(() => {
     return totalValue.toLocaleString("pt-BR", {
@@ -23,6 +58,51 @@ const Cart = () => {
       minimumFractionDigits: 2,
     });
   }, [totalValue]);
+
+  const handleFinalizePurchase = () => {
+    if (!selectedBarbershop || !selectedBarbershop.pixKey) {
+      toast({
+        variant: "destructive",
+        title: "Chave PIX não configurada",
+        description: "A barbearia selecionada não possui chave PIX configurada. Configure no painel administrativo.",
+      });
+      return;
+    }
+
+    const amount = totalValue.toFixed(2).replace('.', ',');
+    const pixData = {
+      key: selectedBarbershop.pixKey,
+      amount: amount,
+      name: selectedBarbershop.name,
+      city: "São Paulo",
+      txId: `CARRINHO-${Date.now()}`,
+    };
+
+    const payload = generatePixCode(pixData);
+    
+    setCurrentPix({
+      payload,
+      data: pixData,
+    });
+    
+    setPixState(PixPaymentState.PAYMENT);
+    setPixDialogOpen(true);
+  };
+
+  const handlePaymentConfirm = () => {
+    setPixState(PixPaymentState.SUCCESS);
+    clearCart();
+  };
+
+  const handlePixReset = () => {
+    setPixState(PixPaymentState.FORM);
+    setCurrentPix(null);
+    setPixDialogOpen(false);
+  };
+
+  const handleBackToForm = () => {
+    setPixState(PixPaymentState.PAYMENT);
+  };
 
   return (
     <div className="min-h-screen">
@@ -145,7 +225,7 @@ const Cart = () => {
                   </p>
                 </CardContent>
                 <CardFooter className="flex flex-col gap-3">
-                  <Button variant="hero" className="w-full">
+                  <Button variant="hero" className="w-full" onClick={handleFinalizePurchase}>
                     Finalizar Compra
                   </Button>
                   <Button
@@ -163,6 +243,25 @@ const Cart = () => {
       </main>
 
       <Footer />
+
+      <Dialog open={pixDialogOpen} onOpenChange={setPixDialogOpen}>
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+          {pixState === PixPaymentState.PAYMENT && currentPix && (
+            <PaymentScreen 
+              data={currentPix} 
+              onConfirm={handlePaymentConfirm}
+              onBack={handleBackToForm}
+            />
+          )}
+
+          {pixState === PixPaymentState.SUCCESS && currentPix && (
+            <SuccessScreen 
+              amount={currentPix.data.amount} 
+              onReset={handlePixReset} 
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
