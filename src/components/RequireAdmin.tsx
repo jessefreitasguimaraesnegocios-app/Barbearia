@@ -22,6 +22,7 @@ const RequireAdmin = ({ children }: Props) => {
 			}
 
 			try {
+				// Consulta direta - a nova RLS policy permite ler próprio profile
 				const { data, error } = await supabase
 					.from('profiles')
 					.select('is_admin')
@@ -29,13 +30,22 @@ const RequireAdmin = ({ children }: Props) => {
 					.single();
 
 				if (error) {
-					console.error('Erro ao verificar admin:', error);
-					setIsAdmin(false);
+					// Se erro for de permissão (RLS) ou não encontrado, não é admin
+					if (error.code === 'PGRST116' || error.code === '42501') {
+						// Profile não existe ou sem permissão
+						console.warn('Profile não encontrado ou sem permissão:', error.message);
+						setIsAdmin(false);
+					} else {
+						console.error('Erro ao verificar admin:', error);
+						setIsAdmin(false);
+					}
 				} else {
+					// Verificar se is_admin é true
 					setIsAdmin(data?.is_admin === true);
 				}
-			} catch (error) {
+			} catch (error: any) {
 				console.error('Erro ao verificar admin:', error);
+				// Em caso de erro inesperado, não é admin
 				setIsAdmin(false);
 			} finally {
 				setCheckingAdmin(false);

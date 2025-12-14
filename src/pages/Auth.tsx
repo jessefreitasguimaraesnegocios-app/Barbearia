@@ -168,16 +168,27 @@ const Auth = () => {
 
         if (profileError && profileError.code === 'PGRST116') {
           // Profile não existe, criar um básico
+          // Verificar se é o primeiro usuário para definir como admin
+          const { count } = await supabase
+            .from('profiles')
+            .select('*', { count: 'exact', head: true });
+          
+          const isFirstUser = (count || 0) === 0;
+          
           await supabase.from('profiles').insert({
             id: data.user.id,
             email: data.user.email,
             full_name: data.user.email?.split('@')[0] || 'Usuário',
-            is_admin: false,
+            is_admin: isFirstUser, // Primeiro usuário é admin
           });
         }
 
-        // Redirecionar após login bem-sucedido
-        navigate("/admin");
+        // Aguardar um pouco mais para garantir que o contexto atualizou
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        // Redirecionar para menu (rota protegida mas não requer admin)
+        // Se for admin, pode acessar /admin depois
+        navigate("/menu");
       }
     } catch (error: any) {
       setLoginMessage(error.message || "Erro ao fazer login. Tente novamente.");
