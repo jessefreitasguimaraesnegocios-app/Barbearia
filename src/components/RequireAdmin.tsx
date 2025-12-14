@@ -1,5 +1,7 @@
 import { Navigate, useLocation } from "react-router-dom";
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useState } from "react";
+import { useAuthContext } from "@/context/AuthContext";
+import { supabase } from "@/lib/supabase";
 
 type Props = {
 	children: ReactNode;
@@ -7,20 +9,50 @@ type Props = {
 
 const RequireAdmin = ({ children }: Props) => {
 	const location = useLocation();
-	let isAdmin = false;
-	try {
-		const stored = localStorage.getItem("activeCollaborator");
-		if (stored) {
-			const parsed = JSON.parse(stored) as { role?: string };
-			isAdmin = parsed.role === "socio" || parsed.role === "dono";
-		}
-	} catch {
-		isAdmin = false;
+	const { user, loading } = useAuthContext();
+	const [isAdmin, setIsAdmin] = useState(false);
+	const [checkingAdmin, setCheckingAdmin] = useState(true);
+
+	useEffect(() => {
+		const checkAdmin = async () => {
+			if (loading || !user) {
+				setCheckingAdmin(false);
+				setIsAdmin(false);
+				return;
+			}
+
+			try {
+				const { data, error } = await supabase
+					.from('profiles')
+					.select('is_admin')
+					.eq('id', user.id)
+					.single();
+
+				if (error) {
+					console.error('Erro ao verificar admin:', error);
+					setIsAdmin(false);
+				} else {
+					setIsAdmin(data?.is_admin === true);
+				}
+			} catch (error) {
+				console.error('Erro ao verificar admin:', error);
+				setIsAdmin(false);
+			} finally {
+				setCheckingAdmin(false);
+			}
+		};
+
+		checkAdmin();
+	}, [user, loading]);
+
+	if (loading || checkingAdmin) {
+		return <div>Carregando...</div>;
 	}
 
-	if (!isAdmin) {
+	if (!user || !isAdmin) {
 		return <Navigate to="/" replace state={{ from: location }} />;
 	}
+
 	return <>{children}</>;
 };
 

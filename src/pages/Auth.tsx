@@ -18,6 +18,8 @@ import { verifyPassword } from "@/lib/password";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/components/ui/sonner";
 import { hashPassword } from "@/lib/password";
+import { useAuthContext } from "@/context/AuthContext";
+import { supabase } from "@/lib/supabase";
 
 const GoogleIcon = () => (
   <svg
@@ -47,6 +49,7 @@ const GoogleIcon = () => (
 
 const Auth = () => {
   const navigate = useNavigate();
+  const { signIn, signUp } = useAuthContext();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -133,68 +136,67 @@ const Auth = () => {
     }, {});
   }, [collaborators]);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setLoginMessage(null);
     setLoginStatus(null);
 
-    const normalizedEmail = loginEmail.trim().toLowerCase();
+    try {
+      const { data, error } = await signIn(loginEmail.trim(), loginPassword);
 
-    const collaborator = collaboratorsByEmail[normalizedEmail];
-
-    if (!collaborator) {
-      setTimeout(() => {
+      if (error) {
+        setLoginMessage(error.message || "Credenciais inválidas. Verifique o e-mail e senha.");
+        setLoginStatus("error");
         setIsLoading(false);
-        setLoginMessage("Credenciais inválidas. Verifique o e-mail informado.");
-        setLoginStatus("error");
-      }, 500);
-      return;
-    }
-
-    const isValidPassword = verifyPassword(loginPassword, collaborator.password);
-
-    setTimeout(() => {
-      setIsLoading(false);
-
-      if (!isValidPassword) {
-        setLoginMessage("Senha incorreta. Tente novamente.");
-        setLoginStatus("error");
         return;
       }
 
-      setLoginMessage(`Bem-vindo, ${collaborator.name}!`);
-      setLoginStatus("success");
+      if (data?.user) {
+        setLoginMessage("Login realizado com sucesso!");
+        setLoginStatus("success");
+        
+        // Aguardar um pouco para garantir que a sessão foi estabelecida
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Verificar se há profile e criar se necessário
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
 
-      localStorage.setItem(
-        "activeCollaborator",
-        JSON.stringify({
-          id: collaborator.id,
-          name: collaborator.name,
-          email: collaborator.email,
-          role: collaborator.role,
-          loggedAt: new Date().toISOString(),
-        }),
-      );
-      // Redireciona colaboradores para a página Início
-      navigate("/");
-    }, 500);
+        if (profileError && profileError.code === 'PGRST116') {
+          // Profile não existe, criar um básico
+          await supabase.from('profiles').insert({
+            id: data.user.id,
+            email: data.user.email,
+            full_name: data.user.email?.split('@')[0] || 'Usuário',
+            is_admin: false,
+          });
+        }
+
+        // Redirecionar após login bem-sucedido
+        navigate("/admin");
+      }
+    } catch (error: any) {
+      setLoginMessage(error.message || "Erro ao fazer login. Tente novamente.");
+      setLoginStatus("error");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setTimeout(() => {
+    
+    try {
       // validações básicas
       const email = signupEmail.trim().toLowerCase();
       if (signupPassword !== signupConfirm) {
         setIsLoading(false);
         toast.error("As senhas não coincidem");
-        return;
-      }
-      if (collaborators.some((c) => c.email.toLowerCase() === email)) {
-        setIsLoading(false);
-        toast.error("E-mail já cadastrado");
         return;
       }
 
@@ -213,6 +215,44 @@ const Auth = () => {
         return;
       }
 
+      // Criar usuário no Supabase
+      const { data: signUpData, error: signUpError } = await signUp(email, signupPassword);
+
+      if (signUpError) {
+        setIsLoading(false);
+        toast.error(signUpError.message || "Erro ao criar conta. Tente novamente.");
+        return;
+      }
+
+      if (!signUpData?.user) {
+        setIsLoading(false);
+        toast.error("Erro ao criar conta. Tente novamente.");
+        return;
+      }
+
+      // Criar profile no Supabase
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: signUpData.user.id,
+          email: email,
+          full_name: signupResponsavel.trim(),
+          phone: phoneNumbers,
+          is_admin: true, // Primeiro usuário é admin
+          metadata: {
+            cpf: cpfNumbers,
+            company: signupCompany,
+            cnpj: signupCnpj,
+            address: signupEndereco,
+          },
+        });
+
+      if (profileError) {
+        console.error('Erro ao criar profile:', profileError);
+        // Não falhar o signup se profile falhar, mas logar o erro
+      }
+
+      // Manter compatibilidade com sistema local (opcional)
       const id =
         (typeof crypto !== "undefined" && "randomUUID" in crypto && crypto.randomUUID()) ||
         `c_${Math.random().toString(36).slice(2, 10)}`;
@@ -229,8 +269,6 @@ const Auth = () => {
         createdAt: new Date().toISOString(),
       };
 
-      // Limpar todos os dados padrão para novo usuário começar do zero
-      // Salvar apenas o novo colaborador (sem dados padrão)
       persistCollaborators([newCollaborator]);
       setCollaborators([newCollaborator]);
 
@@ -348,8 +386,23 @@ const Auth = () => {
 
       setIsLoading(false);
       toast.success("Cadastro Realizado com Sucesso!", { duration: 2000 });
+      
+      // Preencher campos de login e mudar para aba de login
+      setLoginEmail(email);
+      setLoginPassword(signupPassword);
       setTab("login");
-    }, 500);
+      
+      // Aguardar um pouco e fazer login automaticamente
+      setTimeout(async () => {
+        const { data: loginData, error: loginError } = await signIn(email, signupPassword);
+        if (!loginError && loginData?.user) {
+          navigate("/admin");
+        }
+      }, 1000);
+    } catch (error: any) {
+      setIsLoading(false);
+      toast.error(error.message || "Erro ao criar conta. Tente novamente.");
+    }
   };
 
   return (
