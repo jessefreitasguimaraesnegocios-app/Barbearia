@@ -170,19 +170,14 @@ const Auth = () => {
         
         if (profileError && profileError.code === 'PGRST116') {
           // Profile não existe, criar um básico
-          // Verificar se é o primeiro usuário para definir como admin
-          const { count } = await supabase
-            .from('profiles')
-            .select('*', { count: 'exact', head: true });
-          
-          const isFirstUser = (count || 0) === 0;
-          isAdmin = isFirstUser; // Primeiro usuário é admin
+          // Usuários que fazem login mas não têm profile são funcionários (is_admin = false)
+          isAdmin = false;
           
           await supabase.from('profiles').insert({
             id: data.user.id,
             email: data.user.email,
             full_name: data.user.email?.split('@')[0] || 'Usuário',
-            is_admin: isAdmin,
+            is_admin: false, // Funcionários criados no admin têm is_admin = false
           });
         } else if (profile) {
           // Profile existe, verificar se é admin
@@ -251,6 +246,7 @@ const Auth = () => {
       }
 
       // Criar profile no Supabase
+      // TODOS os novos cadastros são donos/admin (is_admin = true)
       const { error: profileError } = await supabase
         .from('profiles')
         .insert({
@@ -258,7 +254,7 @@ const Auth = () => {
           email: email,
           full_name: signupResponsavel.trim(),
           phone: phoneNumbers,
-          is_admin: true, // Primeiro usuário é admin
+          is_admin: true, // Todos os novos cadastros são admin/dono
           metadata: {
             cpf: cpfNumbers,
             company: signupCompany,
