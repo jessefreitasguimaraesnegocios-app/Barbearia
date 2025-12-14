@@ -166,6 +166,8 @@ const Auth = () => {
           .eq('id', data.user.id)
           .single();
 
+        let isAdmin = false;
+        
         if (profileError && profileError.code === 'PGRST116') {
           // Profile não existe, criar um básico
           // Verificar se é o primeiro usuário para definir como admin
@@ -174,21 +176,28 @@ const Auth = () => {
             .select('*', { count: 'exact', head: true });
           
           const isFirstUser = (count || 0) === 0;
+          isAdmin = isFirstUser; // Primeiro usuário é admin
           
           await supabase.from('profiles').insert({
             id: data.user.id,
             email: data.user.email,
             full_name: data.user.email?.split('@')[0] || 'Usuário',
-            is_admin: isFirstUser, // Primeiro usuário é admin
+            is_admin: isAdmin,
           });
+        } else if (profile) {
+          // Profile existe, verificar se é admin
+          isAdmin = profile.is_admin === true;
         }
 
         // Aguardar um pouco mais para garantir que o contexto atualizou
         await new Promise(resolve => setTimeout(resolve, 300));
 
-        // Redirecionar para menu (rota protegida mas não requer admin)
-        // Se for admin, pode acessar /admin depois
-        navigate("/menu");
+        // Redirecionar baseado no tipo de usuário
+        if (isAdmin) {
+          navigate("/admin");
+        } else {
+          navigate("/menu"); // Funcionário/barbeiro
+        }
       }
     } catch (error: any) {
       setLoginMessage(error.message || "Erro ao fazer login. Tente novamente.");
@@ -407,7 +416,20 @@ const Auth = () => {
       setTimeout(async () => {
         const { data: loginData, error: loginError } = await signIn(email, signupPassword);
         if (!loginError && loginData?.user) {
-          navigate("/admin");
+          // Verificar se é admin para redirecionar corretamente
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('is_admin')
+            .eq('id', loginData.user.id)
+            .single();
+          
+          const isAdmin = profileData?.is_admin === true;
+          
+          if (isAdmin) {
+            navigate("/admin"); // Admin vai para dashboard
+          } else {
+            navigate("/menu"); // Funcionário/barbeiro vai para menu
+          }
         }
       }, 1000);
     } catch (error: any) {
