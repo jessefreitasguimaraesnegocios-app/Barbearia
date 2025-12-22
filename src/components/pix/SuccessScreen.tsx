@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 interface SuccessScreenProps {
   amount: string;
   onReset: () => void;
+  paymentType?: 'shop' | 'barbershop';
 }
 
 export const SuccessScreen = ({ amount, onReset }: SuccessScreenProps) => {
@@ -17,7 +18,7 @@ export const SuccessScreen = ({ amount, onReset }: SuccessScreenProps) => {
       </div>
       
       <div>
-        <h2 className="text-3xl font-bold mb-2">PIX Concluído!</h2>
+        <h2 className="text-3xl font-bold mb-2">PIX Confirmado!</h2>
         <p className="text-muted-foreground max-w-xs mx-auto">
           O pagamento de <span className="font-bold">R$ {parseFloat(amount.replace(',', '.')).toFixed(2)}</span> foi confirmado com sucesso.
         </p>

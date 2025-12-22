@@ -12,7 +12,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useCart } from "@/context/CartContext";
 import { Trash2, ShoppingBag, Plus, Minus } from "lucide-react";
 import { useMemo, useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { PaymentScreen } from "@/components/pix/PaymentScreen";
 import { SuccessScreen } from "@/components/pix/SuccessScreen";
 import { generatePixCode } from "@/services/pixService";
@@ -21,6 +21,7 @@ import { loadBarbershops } from "@/lib/barbershops-storage";
 import { useToast } from "@/components/ui/use-toast";
 
 const Cart = () => {
+  const navigate = useNavigate();
   const { items, removeItem, updateQuantity, clearCart, totalValue } = useCart();
   const [pixState, setPixState] = useState<PixPaymentState>(PixPaymentState.FORM);
   const [currentPix, setCurrentPix] = useState<GeneratedPix | null>(null);
@@ -83,6 +84,7 @@ const Cart = () => {
     setCurrentPix({
       payload,
       data: pixData,
+      paymentType: 'shop', // Marcar como pagamento de loja
     });
     
     setPixState(PixPaymentState.PAYMENT);
@@ -92,12 +94,18 @@ const Cart = () => {
   const handlePaymentConfirm = () => {
     setPixState(PixPaymentState.SUCCESS);
     clearCart();
+    // Redirecionar para a loja após 2 segundos
+    setTimeout(() => {
+      setPixDialogOpen(false);
+      navigate('/shop');
+    }, 2000);
   };
 
   const handlePixReset = () => {
     setPixState(PixPaymentState.FORM);
     setCurrentPix(null);
     setPixDialogOpen(false);
+    navigate('/shop');
   };
 
   const handleBackToForm = () => {

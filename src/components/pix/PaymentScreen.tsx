@@ -12,9 +12,10 @@ interface PaymentScreenProps {
   data: GeneratedPix;
   onConfirm: () => void;
   onBack: () => void;
+  paymentType?: 'shop' | 'barbershop'; // Tipo de pagamento para redirecionamento
 }
 
-export const PaymentScreen = ({ data, onConfirm, onBack }: PaymentScreenProps) => {
+export const PaymentScreen = ({ data, onConfirm, onBack, paymentType }: PaymentScreenProps) => {
   const [copied, setCopied] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);

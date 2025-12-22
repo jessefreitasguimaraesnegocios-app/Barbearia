@@ -97,7 +97,7 @@ const AdminFinances = () => {
             if (parsed && Array.isArray(parsed)) {
               allSales.push(...parsed);
             } else if (parsed && parsed.items) {
-              parsed.items.forEach((item: any) => {
+              parsed.items.forEach((item: { id?: number | string; name?: string; quantity?: number; priceValue?: number; price?: number }) => {
                 allSales.push({
                   id: `${key}_${item.id}`,
                   productId: String(item.id),

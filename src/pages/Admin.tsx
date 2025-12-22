@@ -209,18 +209,18 @@ const Admin = () => {
         try {
           const value = localStorage.getItem(key);
           if (value) {
-            const parsed = JSON.parse(value);
+            const parsed = JSON.parse(value) as { total?: number; price?: number; quantity?: number; timestamp?: string; date?: string; items?: Array<{ priceValue?: number; price?: number; quantity?: number }> };
             if (parsed && Array.isArray(parsed)) {
-              parsed.forEach((sale: any) => {
+              parsed.forEach((sale: { total?: number; price?: number; quantity?: number; timestamp?: string; date?: string }) => {
                 if (sale.total || (sale.price && sale.quantity)) {
                   allSales.push({
-                    total: sale.total ?? (sale.price * sale.quantity),
+                    total: sale.total ?? (sale.price! * sale.quantity!),
                     timestamp: sale.timestamp || sale.date || new Date().toISOString(),
                   });
                 }
               });
             } else if (parsed && parsed.items) {
-              parsed.items.forEach((item: any) => {
+              parsed.items.forEach((item: { priceValue?: number; price?: number; quantity?: number }) => {
                 const itemTotal = (item.priceValue || item.price || 0) * (item.quantity || 1);
                 allSales.push({
                   total: itemTotal,

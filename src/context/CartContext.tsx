@@ -57,7 +57,8 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       console.error("[Cart] Error loading cart from localStorage:", error);
       try {
         localStorage.removeItem(STORAGE_KEY);
-      } catch {
+      } catch (removeError) {
+        // Ignore removal errors
       }
       return [];
     }

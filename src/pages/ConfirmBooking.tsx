@@ -218,6 +218,7 @@ const ConfirmBooking = () => {
     setCurrentPix({
       payload,
       data: pixData,
+      paymentType: 'barbershop', // Marcar como pagamento de serviço da barbearia
     });
     
     setPixState(PixPaymentState.PAYMENT);
@@ -257,6 +258,12 @@ const ConfirmBooking = () => {
     
     setPixState(PixPaymentState.SUCCESS);
     localStorage.removeItem("bookingAppointments");
+    
+    // Redirecionar para a página principal após 2 segundos
+    setTimeout(() => {
+      setPixDialogOpen(false);
+      navigate("/");
+    }, 2000);
   };
 
   const handlePixReset = () => {
@@ -553,13 +560,15 @@ const ConfirmBooking = () => {
               data={currentPix} 
               onConfirm={handlePaymentConfirm}
               onBack={handleBackToForm}
+              paymentType="barbershop"
             />
           )}
 
           {pixState === PixPaymentState.SUCCESS && currentPix && (
             <SuccessScreen 
               amount={currentPix.data.amount} 
-              onReset={handlePixReset} 
+              onReset={handlePixReset}
+              paymentType="barbershop"
             />
           )}
         </DialogContent>

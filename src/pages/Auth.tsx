@@ -18,6 +18,7 @@ import { verifyPassword } from "@/lib/password";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/components/ui/sonner";
 import { hashPassword } from "@/lib/password";
+import { supabase, isSupabaseReady } from "@/integrations/supabase/client";
 
 const GoogleIcon = () => (
   <svg
@@ -180,6 +181,177 @@ const Auth = () => {
       navigate("/");
     }, 500);
   };
+
+  const handleGoogleLogin = async () => {
+    // Verificar se Supabase está configurado
+    if (!isSupabaseReady() || !supabase) {
+      toast.error("Autenticação com Google não está disponível. Configure o Supabase no arquivo .env");
+      return;
+    }
+
+    setIsLoading(true);
+    setLoginMessage(null);
+    setLoginStatus(null);
+
+    try {
+      // Iniciar o fluxo OAuth do Google
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth?provider=google`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      // O redirecionamento será tratado no useEffect abaixo
+    } catch (error) {
+      console.error('Erro ao fazer login com Google:', error);
+      setIsLoading(false);
+      setLoginMessage("Erro ao fazer login com Google. Tente novamente.");
+      setLoginStatus("error");
+      toast.error("Erro ao fazer login com Google");
+    }
+  };
+
+  // Verificar se o usuário retornou do OAuth do Google
+  useEffect(() => {
+    const handleGoogleCallback = async () => {
+      // Verificar se Supabase está configurado antes de qualquer coisa
+      if (!isSupabaseReady() || !supabase) {
+        return;
+      }
+
+      // Verificar se há um código de autorização na URL (query params ou hash)
+      const urlParams = new URLSearchParams(window.location.search);
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const provider = urlParams.get('provider') || hashParams.get('provider');
+      
+      // Verificar também se há tokens de acesso no hash (padrão do Supabase)
+      // Mas apenas se realmente houver um provider ou um código de autorização claro
+      const hasAccessToken = window.location.hash.includes('access_token') || 
+                             (window.location.search.includes('code') && provider);
+      
+      // Só processar se houver indicação clara de callback OAuth
+      if (!provider && !hasAccessToken) {
+        return;
+      }
+      
+      if (provider === 'google' || hasAccessToken) {
+        try {
+          setIsLoading(true);
+          
+          // Obter a sessão atual (isso processa o hash automaticamente)
+          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+          
+          if (sessionError) {
+            // Se o erro for 401 ou relacionado a configuração, apenas retornar silenciosamente
+            if (sessionError.message?.includes('Invalid API key') || sessionError.status === 401) {
+              console.warn('Supabase não configurado corretamente. Login com Google não disponível.');
+              return;
+            }
+            throw sessionError;
+          }
+
+          if (session?.user) {
+            const user = session.user;
+            const email = user.email?.toLowerCase() || '';
+            const name = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'Usuário';
+
+            // Recarregar colaboradores para garantir que temos a versão mais recente
+            const currentCollaborators = loadCollaborators();
+            const currentCollaboratorsByEmail = currentCollaborators.reduce<Record<string, Collaborator>>((acc, collab) => {
+              acc[collab.email.toLowerCase()] = collab;
+              return acc;
+            }, {});
+
+            // Verificar se já existe um colaborador com este email
+            const existingCollaborator = currentCollaboratorsByEmail[email];
+
+            if (existingCollaborator) {
+              // Usuário já existe, fazer login
+              localStorage.setItem(
+                "activeCollaborator",
+                JSON.stringify({
+                  id: existingCollaborator.id,
+                  name: existingCollaborator.name,
+                  email: existingCollaborator.email,
+                  role: existingCollaborator.role,
+                  loggedAt: new Date().toISOString(),
+                }),
+              );
+              setLoginMessage(`Bem-vindo de volta, ${existingCollaborator.name}!`);
+              setLoginStatus("success");
+              toast.success(`Bem-vindo, ${existingCollaborator.name}!`);
+            } else {
+              // Criar novo colaborador
+              const id =
+                (typeof crypto !== "undefined" && "randomUUID" in crypto && crypto.randomUUID()) ||
+                `c_${Math.random().toString(36).slice(2, 10)}`;
+
+              const newCollaborator: Collaborator = {
+                id,
+                name,
+                phone: '',
+                email,
+                cpf: '',
+                password: '', // Sem senha para login via Google
+                role: "socio",
+                specialty: "",
+                createdAt: new Date().toISOString(),
+              };
+
+              // Adicionar ao array de colaboradores
+              const updatedCollaborators = [...currentCollaborators, newCollaborator];
+              persistCollaborators(updatedCollaborators);
+              setCollaborators(updatedCollaborators);
+
+              // Salvar sessão ativa
+              localStorage.setItem(
+                "activeCollaborator",
+                JSON.stringify({
+                  id: newCollaborator.id,
+                  name: newCollaborator.name,
+                  email: newCollaborator.email,
+                  role: newCollaborator.role,
+                  loggedAt: new Date().toISOString(),
+                }),
+              );
+
+              setLoginMessage(`Bem-vindo, ${name}!`);
+              setLoginStatus("success");
+              toast.success(`Conta criada com sucesso, ${name}!`);
+            }
+
+            // Limpar parâmetros da URL
+            window.history.replaceState({}, document.title, '/auth');
+            
+            // Redirecionar após um breve delay
+            setTimeout(() => {
+              navigate("/");
+            }, 1000);
+          }
+        } catch (error) {
+          console.error('Erro ao processar callback do Google:', error);
+          setLoginMessage("Erro ao processar login com Google.");
+          setLoginStatus("error");
+          toast.error("Erro ao processar login com Google");
+          // Limpar parâmetros da URL mesmo em caso de erro
+          window.history.replaceState({}, document.title, '/auth');
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    handleGoogleCallback();
+  }, [navigate, setCollaborators]);
 
   const handleSignup = (e: React.FormEvent) => {
     e.preventDefault();
@@ -436,10 +608,12 @@ const Auth = () => {
                       type="button"
                       variant="outline"
                       className="w-full bg-card"
+                      onClick={handleGoogleLogin}
+                      disabled={isLoading}
                     >
                       <span className="flex items-center justify-center space-x-2">
                         <GoogleIcon />
-                        <span>Google</span>
+                        <span>{isLoading ? "Conectando..." : "Continuar com Google"}</span>
                       </span>
                     </Button>
                   </form>

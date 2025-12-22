@@ -324,7 +324,6 @@ const Booking = () => {
   const findSequentialSlots = (startTime: string, availableTimes: string[], requiredSlots: number): string[] => {
     const slots: string[] = [];
     let currentTime = startTime;
-    let currentIndex = getTimeSlotIndex(startTime);
 
     for (let i = 0; i < requiredSlots && currentTime && availableTimes.includes(currentTime); i++) {
       slots.push(currentTime);
@@ -529,12 +528,10 @@ const Booking = () => {
     const requiredSlots = Math.ceil(durationMinutes / 30);
     const occupiedSlots: string[] = [];
     
-    let currentTime = startTime;
-    let currentIndex = getTimeSlotIndex(startTime);
+    const currentIndex = getTimeSlotIndex(startTime);
     
-    for (let i = 0; i < requiredSlots && currentIndex !== -1 && currentIndex < timeSlots.length; i++) {
-      occupiedSlots.push(timeSlots[currentIndex]);
-      currentIndex++;
+    for (let i = 0; i < requiredSlots && currentIndex !== -1 && currentIndex + i < timeSlots.length; i++) {
+      occupiedSlots.push(timeSlots[currentIndex + i]);
     }
     
     return occupiedSlots;
@@ -1235,7 +1232,7 @@ const Booking = () => {
               )}
 
               {/* Step 3 removed - integrated into Step 2 */}
-              {false && step === 3 && (
+              {step === 999 && (
                 <div className="space-y-6">
                   {appointments.length > 0 && (
                     <div className="p-4 bg-secondary/50 rounded-lg border border-border">

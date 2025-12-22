@@ -84,7 +84,7 @@ export const generatePixCode = (data: PixData): string => {
   const additionalDataContent = formatField('05', cleanTxId);
   const additionalData = formatField('62', additionalDataContent);
   
-  let rawPayload = `${payloadFormat}${merchantAccount}${merchantCategory}${transactionCurrency}${transactionAmount}${countryCode}${merchantName}${merchantCity}${additionalData}6304`;
+  const rawPayload = `${payloadFormat}${merchantAccount}${merchantCategory}${transactionCurrency}${transactionAmount}${countryCode}${merchantName}${merchantCity}${additionalData}6304`;
   
   const crc = calculateCRC16(rawPayload);
   
