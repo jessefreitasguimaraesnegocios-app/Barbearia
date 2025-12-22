@@ -33,7 +33,6 @@ import AdminStoreRevenue from "./pages/AdminStoreRevenue";
 import NotFound from "./pages/NotFound";
 import CollaboratorMenu from "./pages/CollaboratorMenu";
 import RequireAdmin from "./components/RequireAdmin";
-import { DatabaseSetup } from "./components/DatabaseSetup";
 
 const queryClient = new QueryClient();
 
@@ -42,7 +41,7 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
   const { isAuthenticated, loading } = useAuthContext();
 
   if (loading) {
-    return <div>Carregando...</div>;
+    return <div>Carregando...</div>; // Ou um componente de loading
   }
 
   if (!isAuthenticated) {
@@ -57,7 +56,9 @@ const RunMigrations = () => {
   useEffect(() => {
     const runMigrations = async () => {
       try {
+        // Aqui você pode adicionar lógica para rodar migrações
         console.log('Verificando migrações...');
+        // Exemplo: await supabase.rpc('run_migrations');
       } catch (error) {
         console.error('Erro ao executar migrações:', error);
       }
@@ -83,12 +84,11 @@ const App = () => {
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
-                  <Route path="/database-setup" element={<DatabaseSetup />} />
-
+                  
                   {/* Rotas públicas */}
                   <Route path="/barbearias" element={<Barbearias />} />
                   <Route path="/services" element={<Services />} />
-
+                  
                   {/* Rotas protegidas */}
                   <Route path="/admin" element={
                     <ProtectedRoute>
@@ -216,7 +216,7 @@ const App = () => {
                       </RequireAdmin>
                     </ProtectedRoute>
                   } />
-
+                  
                   {/* Rota de página não encontrada */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>
