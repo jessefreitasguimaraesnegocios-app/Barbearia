@@ -438,6 +438,9 @@ const Auth = () => {
           const vencimento = new Date(today);
           vencimento.setDate(vencimento.getDate() + 30);
 
+          // Tentar criar profile primeiro (se não existir) para associar ao owner_id
+          // Como o app usa autenticação local, não temos auth.uid(), então owner_id será null
+          // As políticas RLS devem permitir inserção sem owner_id ou com verificação adequada
           const { data: barbershopData, error: barbershopError } = await supabase
             .from('barbershops')
             .insert({
@@ -452,7 +455,7 @@ const Auth = () => {
               hours: newBarbershop.hours || null,
               pix_key: newBarbershop.pixKey || null,
               data_vencimento: vencimento.toISOString().split('T')[0], // Data no formato YYYY-MM-DD
-              owner_id: id, // Associar ao ID do colaborador que criou
+              owner_id: null, // Null porque não temos auth.uid() no cadastro local
             })
             .select()
             .single();
