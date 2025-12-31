@@ -141,8 +141,7 @@ Para habilitar login com Google:
 
 ## 📊 Scripts SQL Disponíveis
 
-- **`supabase_schema.sql`** - Cria toda a estrutura do banco
-- **`supabase_schema_corrigido.sql`** - Corrige políticas RLS
+- **`supabase_schema.sql`** - Cria toda a estrutura do banco (inclui políticas RLS corrigidas)
 - **`seed_database.sql`** - Popula o banco com dados de exemplo
 - **`clear_database.sql`** - Remove todos os dados (mantém estrutura)
 
@@ -163,10 +162,11 @@ Ou qualquer outro colaborador do seed.
 - Reinicie o servidor após configurar o `.env`
 
 ### Erro ao executar SQL
-- Execute os scripts na ordem: schema → corrigido → seed
+- Execute apenas o `supabase_schema.sql` (já inclui todas as correções)
+- Execute o `seed_database.sql` apenas se quiser dados de exemplo
 - Verifique se não há conflitos de dados
 
 ### Problemas de RLS (Row Level Security)
-- Execute o `supabase_schema_corrigido.sql`
-- Verifique se as políticas foram criadas corretamente
+- O `supabase_schema.sql` já inclui todas as políticas RLS corrigidas
+- Verifique se as políticas foram criadas corretamente executando: `SELECT * FROM pg_policies WHERE schemaname = 'public';`
 
