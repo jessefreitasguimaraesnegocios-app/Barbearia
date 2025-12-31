@@ -15,6 +15,8 @@ import { Barbershop, DEFAULT_BARBERSHOPS } from "@/data/barbershops";
 import { loadBarbershops, persistBarbershops, resetBarbershopsToDefault } from "@/lib/barbershops-storage";
 import { getEmptyInventory, persistInventory } from "@/lib/inventory-storage";
 import { ArrowLeft, MapPin, Star, Phone, Clock, Trash2, Plus, RefreshCcw } from "lucide-react";
+import { createBarbershopWithDefaults } from "@/lib/populate-barbershop";
+import { isSupabaseReady } from "@/integrations/supabase/client";
 
 const generateUUID = (): string => {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -177,18 +179,18 @@ const AdminProfile = () => {
     handleUpdate("rating", Number(clamped.toFixed(1)));
   };
 
-  const handleAddBarbershop = () => {
+  const handleAddBarbershop = async () => {
     const today = new Date();
     const vencimento = new Date(today);
     vencimento.setDate(vencimento.getDate() + 30);
 
     const newBarbershop: Barbershop = {
       id: generateUUID(),
-      name: "",
+      name: "Nova Barbearia",
       rating: 0,
       address: "",
       phone: "",
-      hours: "",
+      hours: "Seg à Sáb • 09h às 18h",
       isOpen: true,
       email: "",
       pixKey: "",
@@ -203,6 +205,16 @@ const AdminProfile = () => {
       return updated;
     });
 
+    // Salvar barbearia no Supabase e popular com dados padrão
+    if (isSupabaseReady()) {
+      try {
+        await createBarbershopWithDefaults(newBarbershop, null);
+      } catch (error) {
+        console.error('Erro ao criar barbearia no Supabase:', error);
+      }
+    }
+
+    // Criar inventário padrão no localStorage
     const emptyInventory = getEmptyInventory();
     persistInventory(emptyInventory, newBarbershop.id);
 
@@ -211,7 +223,7 @@ const AdminProfile = () => {
 
     toast({
       title: "Barbearia adicionada",
-      description: "Preencha os detalhes da nova unidade.",
+      description: "Barbearia criada com serviços e produtos padrão. Preencha os detalhes.",
     });
   };
 

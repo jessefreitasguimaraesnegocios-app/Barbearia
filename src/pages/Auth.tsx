@@ -20,6 +20,7 @@ import { toast } from "@/components/ui/sonner";
 import { hashPassword } from "@/lib/password";
 import { supabase, isSupabaseReady } from "@/integrations/supabase/client";
 import { Barbershop } from "@/data/barbershops";
+import { createBarbershopWithDefaults } from "@/lib/populate-barbershop";
 
 const GoogleIcon = () => (
   <svg
