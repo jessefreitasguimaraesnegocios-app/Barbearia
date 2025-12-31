@@ -37,8 +37,7 @@ Para instruções detalhadas de configuração, consulte: **[SETUP.md](./SETUP.m
 
 ## 📚 Documentação
 
-- **[SETUP.md](./SETUP.md)** - Guia completo de configuração
-- **[CONFIGURAR_GOOGLE_OAUTH.md](./CONFIGURAR_GOOGLE_OAUTH.md)** - Configurar login com Google
+- **[SETUP.md](./SETUP.md)** - Guia completo de configuração (inclui deploy no Vercel e OAuth Google)
 
 ## 🗄️ Banco de Dados
 
