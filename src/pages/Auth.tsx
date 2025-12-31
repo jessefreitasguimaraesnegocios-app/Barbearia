@@ -21,6 +21,8 @@ import { hashPassword } from "@/lib/password";
 import { supabase, isSupabaseReady } from "@/integrations/supabase/client";
 import { Barbershop } from "@/data/barbershops";
 import { createBarbershopWithDefaults } from "@/lib/populate-barbershop";
+import { DEFAULT_SERVICES } from "@/data/services";
+import { DEFAULT_STORE_PRODUCTS } from "@/data/inventory";
 
 const GoogleIcon = () => (
   <svg
@@ -428,54 +430,29 @@ const Auth = () => {
         status: "disponivel",
       };
 
+      // Calcular data de vencimento (30 dias a partir de hoje)
+      const today = new Date();
+      const vencimento = new Date(today);
+      vencimento.setDate(vencimento.getDate() + 30);
+      
+      // Atualizar barbearia com data de vencimento
+      const barbershopWithVencimento = {
+        ...newBarbershop,
+        dataVencimento: vencimento.toISOString().split('T')[0],
+        hours: newBarbershop.hours || "Seg à Sáb • 09h às 21h", // Horário padrão
+      };
+
       // Salvar barbearia no localStorage
-      persistBarbershops([newBarbershop]);
+      persistBarbershops([barbershopWithVencimento]);
 
-      // Salvar barbearia no Supabase (se configurado)
-      if (isSupabaseReady() && supabase) {
+      // Salvar barbearia no Supabase e popular com dados padrão
+      if (isSupabaseReady()) {
         try {
-          // Calcular data de vencimento (30 dias a partir de hoje)
-          const today = new Date();
-          const vencimento = new Date(today);
-          vencimento.setDate(vencimento.getDate() + 30);
-
-          // Tentar criar profile primeiro (se não existir) para associar ao owner_id
-          // Como o app usa autenticação local, não temos auth.uid(), então owner_id será null
-          // As políticas RLS devem permitir inserção sem owner_id ou com verificação adequada
-          const { data: barbershopData, error: barbershopError } = await supabase
-            .from('barbershops')
-            .insert({
-              id: barbershopId, // Usar o ID gerado localmente
-              name: newBarbershop.name,
-              address: newBarbershop.address || null,
-              phone: phoneNumbers, // Salvar sem formatação no banco
-              email: newBarbershop.email,
-              is_open: newBarbershop.isOpen,
-              status: 'disponivel',
-              rating: 0,
-              hours: newBarbershop.hours || null,
-              pix_key: newBarbershop.pixKey || null,
-              data_vencimento: vencimento.toISOString().split('T')[0], // Data no formato YYYY-MM-DD
-              owner_id: null, // Null porque não temos auth.uid() no cadastro local
-            })
-            .select()
-            .single();
-
-          if (barbershopError) {
-            console.error('Erro ao salvar barbearia no Supabase:', barbershopError);
-            console.error('Detalhes do erro:', JSON.stringify(barbershopError, null, 2));
-            toast.error(`Erro ao salvar no banco: ${barbershopError.message || 'Erro desconhecido'}`);
-            // Não bloqueia o cadastro se falhar no Supabase, mas mostra o erro
-          } else {
-            console.log('✅ Barbearia salva no Supabase com sucesso:', barbershopData);
-            // Usar o ID retornado do Supabase (caso tenha sido gerado)
-            const finalId = barbershopData?.id || barbershopId;
-            const updatedBarbershop = { ...newBarbershop, id: finalId };
-            persistBarbershops([updatedBarbershop]);
-          }
+          await createBarbershopWithDefaults(barbershopWithVencimento, id);
+          console.log('✅ Barbearia criada no Supabase com dados padrão');
+          toast.success(`Barbearia criada com ${DEFAULT_SERVICES.length} serviços e ${DEFAULT_STORE_PRODUCTS.length} produtos padrão!`);
         } catch (error: any) {
-          console.error('Erro ao tentar salvar barbearia no Supabase:', error);
-          console.error('Stack trace:', error?.stack);
+          console.error('❌ Erro ao criar barbearia no Supabase:', error);
           toast.error(`Erro ao salvar no banco: ${error?.message || 'Erro desconhecido'}`);
           // Não bloqueia o cadastro se falhar no Supabase
         }
