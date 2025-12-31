@@ -39,7 +39,7 @@ export async function populateBarbershopWithDefaults(barbershopId: string): Prom
       };
     });
 
-    const { error: servicesError } = await supabase
+    const { error: servicesError } = await (supabase as any)
       .from('services')
       .insert(servicesToInsert);
 
@@ -80,7 +80,7 @@ export async function populateBarbershopWithDefaults(barbershopId: string): Prom
       };
     });
 
-    const { error: productsError } = await supabase
+    const { error: productsError } = await (supabase as any)
       .from('store_products')
       .insert(productsToInsert);
 
@@ -126,7 +126,7 @@ export async function saveBarbershopToSupabase(barbershop: Barbershop, ownerId: 
     const vencimento = new Date(today);
     vencimento.setDate(vencimento.getDate() + 30);
 
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('barbershops')
       .insert({
         id: barbershop.id,
