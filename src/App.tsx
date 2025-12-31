@@ -33,6 +33,7 @@ import AdminStoreRevenue from "./pages/AdminStoreRevenue";
 import NotFound from "./pages/NotFound";
 import CollaboratorMenu from "./pages/CollaboratorMenu";
 import RequireAdmin from "./components/RequireAdmin";
+import ProtectedRouteLocal from "./components/ProtectedRouteLocal";
 import { DatabaseSetup } from "./components/DatabaseSetup";
 import { SupabaseSync } from "./components/SupabaseSync";
 
@@ -103,25 +104,25 @@ const App = () => {
                     </RequireAdmin>
                   } />
                   <Route path="/booking" element={
-                    <ProtectedRoute>
+                    <ProtectedRouteLocal>
                       <Booking />
-                    </ProtectedRoute>
+                    </ProtectedRouteLocal>
                   } />
                   <Route path="/booking/confirm" element={
-                    <ProtectedRoute>
+                    <ProtectedRouteLocal>
                       <ConfirmBooking />
-                    </ProtectedRoute>
+                    </ProtectedRouteLocal>
                   } />
                   <Route path="/menu" element={
-                    <ProtectedRoute>
+                    <ProtectedRouteLocal>
                       <CollaboratorMenu />
-                    </ProtectedRoute>
+                    </ProtectedRouteLocal>
                   } />
                   <Route path="/shop" element={<Shop />} />
                   <Route path="/cart" element={
-                    <ProtectedRoute>
+                    <ProtectedRouteLocal>
                       <Cart />
-                    </ProtectedRoute>
+                    </ProtectedRouteLocal>
                   } />
                   <Route path="/admin/agendamentos" element={
                     <RequireAdmin>

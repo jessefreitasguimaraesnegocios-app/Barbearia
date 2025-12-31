@@ -433,9 +433,15 @@ const Auth = () => {
       // Salvar barbearia no Supabase (se configurado)
       if (isSupabaseReady() && supabase) {
         try {
+          // Calcular data de vencimento (30 dias a partir de hoje)
+          const today = new Date();
+          const vencimento = new Date(today);
+          vencimento.setDate(vencimento.getDate() + 30);
+
           const { data: barbershopData, error: barbershopError } = await supabase
             .from('barbershops')
             .insert({
+              id: barbershopId, // Usar o ID gerado localmente
               name: newBarbershop.name,
               address: newBarbershop.address || null,
               phone: phoneNumbers, // Salvar sem formatação no banco
@@ -443,27 +449,30 @@ const Auth = () => {
               is_open: newBarbershop.isOpen,
               status: 'disponivel',
               rating: 0,
-              hours: null,
-              pix_key: null,
+              hours: newBarbershop.hours || null,
+              pix_key: newBarbershop.pixKey || null,
+              data_vencimento: vencimento.toISOString().split('T')[0], // Data no formato YYYY-MM-DD
+              owner_id: id, // Associar ao ID do colaborador que criou
             })
             .select()
             .single();
 
           if (barbershopError) {
             console.error('Erro ao salvar barbearia no Supabase:', barbershopError);
-            toast.error("Cadastro realizado, mas houve um problema ao salvar no banco de dados");
-            // Não bloqueia o cadastro se falhar no Supabase
+            console.error('Detalhes do erro:', JSON.stringify(barbershopError, null, 2));
+            toast.error(`Erro ao salvar no banco: ${barbershopError.message || 'Erro desconhecido'}`);
+            // Não bloqueia o cadastro se falhar no Supabase, mas mostra o erro
           } else {
-            console.log('Barbearia salva no Supabase com sucesso:', barbershopData);
-            // Atualizar o ID da barbearia no localStorage com o ID retornado do Supabase
-            if (barbershopData?.id) {
-              const updatedBarbershop = { ...newBarbershop, id: barbershopData.id };
-              persistBarbershops([updatedBarbershop]);
-            }
+            console.log('✅ Barbearia salva no Supabase com sucesso:', barbershopData);
+            // Usar o ID retornado do Supabase (caso tenha sido gerado)
+            const finalId = barbershopData?.id || barbershopId;
+            const updatedBarbershop = { ...newBarbershop, id: finalId };
+            persistBarbershops([updatedBarbershop]);
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error('Erro ao tentar salvar barbearia no Supabase:', error);
-          toast.error("Cadastro realizado, mas houve um problema ao salvar no banco de dados");
+          console.error('Stack trace:', error?.stack);
+          toast.error(`Erro ao salvar no banco: ${error?.message || 'Erro desconhecido'}`);
           // Não bloqueia o cadastro se falhar no Supabase
         }
       }
