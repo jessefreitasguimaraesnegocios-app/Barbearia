@@ -32,9 +32,8 @@ VITE_SUPABASE_PUBLISHABLE_KEY=sua-chave-publica-aqui
 1. Acesse: https://app.supabase.com
 2. Crie um novo projeto
 3. Vá em **SQL Editor** → **New Query**
-4. Execute o arquivo `supabase_schema.sql` (cria a estrutura)
-5. Execute o arquivo `supabase_schema_corrigido.sql` (corrige políticas RLS)
-6. Execute o arquivo `seed_database.sql` (popula com dados de exemplo - opcional)
+4. Execute o arquivo `supabase_schema.sql` (cria toda a estrutura com políticas RLS corretas)
+5. Execute o arquivo `seed_database.sql` (popula com dados de exemplo - opcional)
 
 ### 4. Executar o Projeto
 

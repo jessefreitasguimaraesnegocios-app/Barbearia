@@ -455,6 +455,25 @@ ALTER TABLE public.shop_sales ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.expenses ENABLE ROW LEVEL SECURITY;
 
 -- ============================================
+-- FUNÇÃO HELPER PARA RLS (evita recursão)
+-- ============================================
+
+-- Função para verificar se o usuário é admin (usa SECURITY DEFINER para evitar recursão)
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS boolean 
+LANGUAGE plpgsql 
+SECURITY DEFINER 
+STABLE
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.profiles 
+    WHERE id = auth.uid() AND is_admin = true
+  );
+END;
+$$;
+
+-- ============================================
 -- POLÍTICAS RLS
 -- ============================================
 
@@ -467,17 +486,17 @@ DROP POLICY IF EXISTS profiles_select_owner_or_admin ON public.profiles;
 CREATE POLICY profiles_select_owner_or_admin ON public.profiles
   FOR SELECT USING (
     (id = auth.uid())
-    OR (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.is_admin = true))
+    OR public.is_admin()
   );
 
 DROP POLICY IF EXISTS profiles_update_owner_or_admin ON public.profiles;
 CREATE POLICY profiles_update_owner_or_admin ON public.profiles
   FOR UPDATE USING (
     (id = auth.uid())
-    OR (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.is_admin = true))
+    OR public.is_admin()
   ) WITH CHECK (
     (id = auth.uid())
-    OR (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.is_admin = true))
+    OR public.is_admin()
   );
 
 -- Barbearias: públicas para leitura, admin/dono pode editar
@@ -488,41 +507,118 @@ CREATE POLICY barbershops_select_public ON public.barbershops
 DROP POLICY IF EXISTS barbershops_insert_admin ON public.barbershops;
 CREATE POLICY barbershops_insert_admin ON public.barbershops
   FOR INSERT WITH CHECK (
-    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.is_admin = true)
+    public.is_admin()
     OR (owner_id = auth.uid())
   );
 
 DROP POLICY IF EXISTS barbershops_update_admin ON public.barbershops;
 CREATE POLICY barbershops_update_admin ON public.barbershops
   FOR UPDATE USING (
-    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.is_admin = true)
+    public.is_admin()
     OR (owner_id = auth.uid())
   );
 
--- Serviços: públicos para leitura
+-- Collaborators: autenticados podem ler, apenas admin pode modificar
+DROP POLICY IF EXISTS collaborators_select_authenticated ON public.collaborators;
+CREATE POLICY collaborators_select_authenticated ON public.collaborators
+  FOR SELECT USING (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS collaborators_insert_admin ON public.collaborators;
+CREATE POLICY collaborators_insert_admin ON public.collaborators
+  FOR INSERT WITH CHECK (public.is_admin());
+
+DROP POLICY IF EXISTS collaborators_update_admin ON public.collaborators;
+CREATE POLICY collaborators_update_admin ON public.collaborators
+  FOR UPDATE USING (public.is_admin()) WITH CHECK (public.is_admin());
+
+DROP POLICY IF EXISTS collaborators_delete_admin ON public.collaborators;
+CREATE POLICY collaborators_delete_admin ON public.collaborators
+  FOR DELETE USING (public.is_admin());
+
+-- Serviços: públicos para leitura, admin pode modificar
 DROP POLICY IF EXISTS services_select_public ON public.services;
 CREATE POLICY services_select_public ON public.services 
   FOR SELECT USING (true);
 
--- Produtos da loja: públicos para leitura
+DROP POLICY IF EXISTS services_insert_admin ON public.services;
+CREATE POLICY services_insert_admin ON public.services
+  FOR INSERT WITH CHECK (public.is_admin());
+
+DROP POLICY IF EXISTS services_update_admin ON public.services;
+CREATE POLICY services_update_admin ON public.services
+  FOR UPDATE USING (public.is_admin()) WITH CHECK (public.is_admin());
+
+DROP POLICY IF EXISTS services_delete_admin ON public.services;
+CREATE POLICY services_delete_admin ON public.services
+  FOR DELETE USING (public.is_admin());
+
+-- Produtos da loja: públicos para leitura, admin pode modificar
 DROP POLICY IF EXISTS store_products_select_public ON public.store_products;
 CREATE POLICY store_products_select_public ON public.store_products 
   FOR SELECT USING (true);
 
--- Itens de consumo: públicos para leitura
+DROP POLICY IF EXISTS store_products_insert_admin ON public.store_products;
+CREATE POLICY store_products_insert_admin ON public.store_products
+  FOR INSERT WITH CHECK (public.is_admin());
+
+DROP POLICY IF EXISTS store_products_update_admin ON public.store_products;
+CREATE POLICY store_products_update_admin ON public.store_products
+  FOR UPDATE USING (public.is_admin()) WITH CHECK (public.is_admin());
+
+DROP POLICY IF EXISTS store_products_delete_admin ON public.store_products;
+CREATE POLICY store_products_delete_admin ON public.store_products
+  FOR DELETE USING (public.is_admin());
+
+-- Itens de consumo: públicos para leitura, admin pode modificar
 DROP POLICY IF EXISTS consumables_select_public ON public.consumables;
 CREATE POLICY consumables_select_public ON public.consumables 
   FOR SELECT USING (true);
 
--- Configurações VIP: públicas
+DROP POLICY IF EXISTS consumables_insert_admin ON public.consumables;
+CREATE POLICY consumables_insert_admin ON public.consumables
+  FOR INSERT WITH CHECK (public.is_admin());
+
+DROP POLICY IF EXISTS consumables_update_admin ON public.consumables;
+CREATE POLICY consumables_update_admin ON public.consumables
+  FOR UPDATE USING (public.is_admin()) WITH CHECK (public.is_admin());
+
+DROP POLICY IF EXISTS consumables_delete_admin ON public.consumables;
+CREATE POLICY consumables_delete_admin ON public.consumables
+  FOR DELETE USING (public.is_admin());
+
+-- Configurações VIP: públicas, admin pode modificar
 DROP POLICY IF EXISTS vip_configs_select_public ON public.vip_configs;
 CREATE POLICY vip_configs_select_public ON public.vip_configs 
   FOR SELECT USING (true);
 
--- Membros VIP: públicos
+DROP POLICY IF EXISTS vip_configs_insert_admin ON public.vip_configs;
+CREATE POLICY vip_configs_insert_admin ON public.vip_configs
+  FOR INSERT WITH CHECK (public.is_admin());
+
+DROP POLICY IF EXISTS vip_configs_update_admin ON public.vip_configs;
+CREATE POLICY vip_configs_update_admin ON public.vip_configs
+  FOR UPDATE USING (public.is_admin()) WITH CHECK (public.is_admin());
+
+DROP POLICY IF EXISTS vip_configs_delete_admin ON public.vip_configs;
+CREATE POLICY vip_configs_delete_admin ON public.vip_configs
+  FOR DELETE USING (public.is_admin());
+
+-- Membros VIP: públicos para leitura, autenticados podem inserir, admin pode modificar
 DROP POLICY IF EXISTS vip_members_select_public ON public.vip_members;
 CREATE POLICY vip_members_select_public ON public.vip_members 
   FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS vip_members_insert_authenticated ON public.vip_members;
+CREATE POLICY vip_members_insert_authenticated ON public.vip_members
+  FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS vip_members_update_admin ON public.vip_members;
+CREATE POLICY vip_members_update_admin ON public.vip_members
+  FOR UPDATE USING (public.is_admin()) WITH CHECK (public.is_admin());
+
+DROP POLICY IF EXISTS vip_members_delete_admin ON public.vip_members;
+CREATE POLICY vip_members_delete_admin ON public.vip_members
+  FOR DELETE USING (public.is_admin());
 
 -- Bookings: usuário vê os próprios, admin vê todos
 DROP POLICY IF EXISTS bookings_insert_authenticated ON public.bookings;
@@ -533,10 +629,27 @@ DROP POLICY IF EXISTS bookings_select_owner_or_admin ON public.bookings;
 CREATE POLICY bookings_select_owner_or_admin ON public.bookings 
   FOR SELECT USING (
     (created_by = auth.uid()) 
-    OR (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.is_admin = true))
+    OR public.is_admin()
   );
 
--- Appointments: autenticados podem inserir
+DROP POLICY IF EXISTS bookings_update_owner_or_admin ON public.bookings;
+CREATE POLICY bookings_update_owner_or_admin ON public.bookings
+  FOR UPDATE USING (
+    (created_by = auth.uid())
+    OR public.is_admin()
+  ) WITH CHECK (
+    (created_by = auth.uid())
+    OR public.is_admin()
+  );
+
+DROP POLICY IF EXISTS bookings_delete_owner_or_admin ON public.bookings;
+CREATE POLICY bookings_delete_owner_or_admin ON public.bookings
+  FOR DELETE USING (
+    (created_by = auth.uid())
+    OR public.is_admin()
+  );
+
+-- Appointments: autenticados podem inserir e ver
 DROP POLICY IF EXISTS appointments_insert_authenticated ON public.appointments;
 CREATE POLICY appointments_insert_authenticated ON public.appointments 
   FOR INSERT WITH CHECK (auth.role() = 'authenticated' AND auth.uid() IS NOT NULL);
@@ -545,7 +658,27 @@ DROP POLICY IF EXISTS appointments_select_authenticated ON public.appointments;
 CREATE POLICY appointments_select_authenticated ON public.appointments
   FOR SELECT USING (auth.role() = 'authenticated');
 
--- Payments: autenticados podem inserir
+DROP POLICY IF EXISTS appointments_update_admin_or_booking_owner ON public.appointments;
+CREATE POLICY appointments_update_admin_or_booking_owner ON public.appointments
+  FOR UPDATE USING (
+    public.is_admin()
+    OR EXISTS (
+      SELECT 1 FROM public.bookings b 
+      WHERE b.id = appointments.booking_id AND b.created_by = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS appointments_delete_admin_or_booking_owner ON public.appointments;
+CREATE POLICY appointments_delete_admin_or_booking_owner ON public.appointments
+  FOR DELETE USING (
+    public.is_admin()
+    OR EXISTS (
+      SELECT 1 FROM public.bookings b 
+      WHERE b.id = appointments.booking_id AND b.created_by = auth.uid()
+    )
+  );
+
+-- Payments: autenticados podem inserir e ver, admin pode modificar
 DROP POLICY IF EXISTS payments_insert_authenticated ON public.payments;
 CREATE POLICY payments_insert_authenticated ON public.payments 
   FOR INSERT WITH CHECK (auth.role() = 'authenticated' AND auth.uid() IS NOT NULL);
@@ -554,22 +687,63 @@ DROP POLICY IF EXISTS payments_select_authenticated ON public.payments;
 CREATE POLICY payments_select_authenticated ON public.payments
   FOR SELECT USING (auth.role() = 'authenticated');
 
--- Vendas da loja: públicas
+DROP POLICY IF EXISTS payments_update_admin ON public.payments;
+CREATE POLICY payments_update_admin ON public.payments
+  FOR UPDATE USING (public.is_admin()) WITH CHECK (public.is_admin());
+
+DROP POLICY IF EXISTS payments_delete_admin ON public.payments;
+CREATE POLICY payments_delete_admin ON public.payments
+  FOR DELETE USING (public.is_admin());
+
+-- Vendas da loja: públicas para leitura, autenticados podem inserir, admin pode modificar
 DROP POLICY IF EXISTS shop_sales_select_public ON public.shop_sales;
 CREATE POLICY shop_sales_select_public ON public.shop_sales 
   FOR SELECT USING (true);
 
--- Despesas: admin/dono vê todas
+DROP POLICY IF EXISTS shop_sales_insert_authenticated ON public.shop_sales;
+CREATE POLICY shop_sales_insert_authenticated ON public.shop_sales
+  FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS shop_sales_update_admin ON public.shop_sales;
+CREATE POLICY shop_sales_update_admin ON public.shop_sales
+  FOR UPDATE USING (public.is_admin()) WITH CHECK (public.is_admin());
+
+DROP POLICY IF EXISTS shop_sales_delete_admin ON public.shop_sales;
+CREATE POLICY shop_sales_delete_admin ON public.shop_sales
+  FOR DELETE USING (public.is_admin());
+
+-- Despesas: criador e admin podem ver/modificar
 DROP POLICY IF EXISTS expenses_select_admin ON public.expenses;
 CREATE POLICY expenses_select_admin ON public.expenses 
   FOR SELECT USING (
     (created_by = auth.uid()) 
-    OR (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.is_admin = true))
+    OR public.is_admin()
   );
 
 DROP POLICY IF EXISTS expenses_insert_authenticated ON public.expenses;
 CREATE POLICY expenses_insert_authenticated ON public.expenses
   FOR INSERT WITH CHECK (auth.role() = 'authenticated' AND auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS expenses_update_owner_or_admin ON public.expenses;
+CREATE POLICY expenses_update_owner_or_admin ON public.expenses
+  FOR UPDATE USING (
+    (created_by = auth.uid())
+    OR public.is_admin()
+  ) WITH CHECK (
+    (created_by = auth.uid())
+    OR public.is_admin()
+  );
+
+DROP POLICY IF EXISTS expenses_delete_owner_or_admin ON public.expenses;
+CREATE POLICY expenses_delete_owner_or_admin ON public.expenses
+  FOR DELETE USING (
+    (created_by = auth.uid())
+    OR public.is_admin()
+  );
+
+DROP POLICY IF EXISTS barbershops_delete_admin ON public.barbershops;
+CREATE POLICY barbershops_delete_admin ON public.barbershops
+  FOR DELETE USING (public.is_admin());
 
 -- ============================================
 -- TRIGGER para criar perfil automaticamente
