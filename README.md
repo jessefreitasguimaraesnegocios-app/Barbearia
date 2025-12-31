@@ -1,73 +1,103 @@
-# Welcome to your Lovable project
+# 💈 BarberBook Pro
 
-## Project info
+Sistema completo de gestão para barbearias com agendamento, loja virtual, controle financeiro e muito mais.
 
-**URL**: https://lovable.dev/projects/fddb1058-5178-4a04-b61a-75ee040e6117
+## ✨ Funcionalidades
 
-## How can I edit this code?
+- 📅 **Agendamento Online** - Sistema completo de reservas
+- 🛒 **Loja Virtual** - Venda de produtos para clientes
+- 👥 **Gestão de Colaboradores** - Controle de barbeiros e funcionários
+- 💰 **Controle Financeiro** - Receitas, despesas e relatórios
+- 🎯 **Programa VIP** - Clientes premium com benefícios
+- 📦 **Controle de Estoque** - Produtos e consumíveis
+- 💳 **Pagamento PIX** - Integração com validação automática de comprovantes
+- 🔐 **Autenticação** - Login seguro com Google OAuth
 
-There are several ways of editing your application.
+## 🚀 Começando
 
-**Use Lovable**
+### Instalação
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/fddb1058-5178-4a04-b61a-75ee040e6117) and start prompting.
+```bash
+# Clonar repositório
+git clone https://github.com/jessefreitasguimaraesnegocios-app/Barbearia.git
 
-Changes made via Lovable will be committed automatically to this repo.
+# Instalar dependências
+npm install
 
-**Use your preferred IDE**
+# Configurar variáveis de ambiente (ver SETUP.md)
+# Criar arquivo .env com VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Executar projeto
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### Configuração Completa
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Para instruções detalhadas de configuração, consulte: **[SETUP.md](./SETUP.md)**
 
-**Use GitHub Codespaces**
+## 📚 Documentação
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+- **[SETUP.md](./SETUP.md)** - Guia completo de configuração
+- **[CONFIGURAR_GOOGLE_OAUTH.md](./CONFIGURAR_GOOGLE_OAUTH.md)** - Configurar login com Google
 
-## What technologies are used for this project?
+## 🗄️ Banco de Dados
 
-This project is built with:
+### Scripts SQL
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+1. **`supabase_schema.sql`** - Cria a estrutura completa do banco
+2. **`supabase_schema_corrigido.sql`** - Corrige políticas RLS
+3. **`seed_database.sql`** - Popula com dados de exemplo
+4. **`clear_database.sql`** - Limpa todos os dados
 
-## How can I deploy this project?
+### Ordem de Execução
 
-Simply open [Lovable](https://lovable.dev/projects/fddb1058-5178-4a04-b61a-75ee040e6117) and click on Share -> Publish.
+```sql
+-- 1. Criar estrutura
+-- Execute: supabase_schema.sql
 
-## Can I connect a custom domain to my Lovable project?
+-- 2. Corrigir RLS
+-- Execute: supabase_schema_corrigido.sql
 
-Yes, you can!
+-- 3. Popular dados (opcional)
+-- Execute: seed_database.sql
+```
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## 🛠️ Tecnologias
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- **React** + **TypeScript**
+- **Vite** - Build tool
+- **Supabase** - Backend (PostgreSQL + Auth)
+- **Tailwind CSS** - Estilização
+- **shadcn/ui** - Componentes UI
+- **Vercel** - Deploy
+
+## 📝 Estrutura do Projeto
+
+```
+Barbearia/
+├── src/
+│   ├── components/     # Componentes React
+│   ├── pages/          # Páginas da aplicação
+│   ├── services/       # Serviços (PIX, validação, etc.)
+│   ├── lib/            # Utilitários e storage
+│   ├── data/           # Dados padrão
+│   └── integrations/   # Integrações (Supabase)
+├── supabase_schema.sql      # Schema do banco
+├── supabase_schema_corrigido.sql  # Correções RLS
+├── seed_database.sql         # Dados de exemplo
+└── clear_database.sql        # Limpar dados
+```
+
+## 🔐 Autenticação
+
+O sistema suporta:
+- ✅ Login com email/senha (localStorage)
+- ✅ Login com Google (Supabase OAuth)
+
+## 📄 Licença
+
+Este projeto é privado.
+
+## 🤝 Suporte
+
+Para dúvidas ou problemas, consulte a documentação em `SETUP.md` ou abra uma issue no repositório.

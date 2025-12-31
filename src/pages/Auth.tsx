@@ -19,6 +19,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "@/components/ui/sonner";
 import { hashPassword } from "@/lib/password";
 import { supabase, isSupabaseReady } from "@/integrations/supabase/client";
+import { Barbershop } from "@/data/barbershops";
 
 const GoogleIcon = () => (
   <svg
@@ -353,10 +354,11 @@ const Auth = () => {
     handleGoogleCallback();
   }, [navigate, setCollaborators]);
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setTimeout(() => {
+
+    try {
       // validações básicas
       const email = signupEmail.trim().toLowerCase();
       if (signupPassword !== signupConfirm) {
@@ -406,11 +408,67 @@ const Auth = () => {
       persistCollaborators([newCollaborator]);
       setCollaborators([newCollaborator]);
 
-      // Limpar e salvar arrays vazios para garantir dashboard limpo
-      // Barbearias: array vazio
-      persistBarbershops([]);
+      // Criar e salvar a barbearia
+      const barbershopId =
+        (typeof crypto !== "undefined" && "randomUUID" in crypto && crypto.randomUUID()) ||
+        `bs_${Math.random().toString(36).slice(2, 10)}`;
 
-      // Serviços: array vazio
+      const phoneFormatted = formatPhone(signupWhatsapp);
+      const newBarbershop: Barbershop = {
+        id: barbershopId,
+        name: signupCompany.trim() || "Minha Barbearia",
+        rating: 0,
+        address: signupEndereco.trim() || "",
+        phone: phoneFormatted,
+        hours: "",
+        isOpen: true,
+        email: email,
+        pixKey: "",
+        status: "disponivel",
+      };
+
+      // Salvar barbearia no localStorage
+      persistBarbershops([newBarbershop]);
+
+      // Salvar barbearia no Supabase (se configurado)
+      if (isSupabaseReady() && supabase) {
+        try {
+          const { data: barbershopData, error: barbershopError } = await supabase
+            .from('barbershops')
+            .insert({
+              name: newBarbershop.name,
+              address: newBarbershop.address || null,
+              phone: phoneNumbers, // Salvar sem formatação no banco
+              email: newBarbershop.email,
+              is_open: newBarbershop.isOpen,
+              status: 'disponivel',
+              rating: 0,
+              hours: null,
+              pix_key: null,
+            })
+            .select()
+            .single();
+
+          if (barbershopError) {
+            console.error('Erro ao salvar barbearia no Supabase:', barbershopError);
+            toast.error("Cadastro realizado, mas houve um problema ao salvar no banco de dados");
+            // Não bloqueia o cadastro se falhar no Supabase
+          } else {
+            console.log('Barbearia salva no Supabase com sucesso:', barbershopData);
+            // Atualizar o ID da barbearia no localStorage com o ID retornado do Supabase
+            if (barbershopData?.id) {
+              const updatedBarbershop = { ...newBarbershop, id: barbershopData.id };
+              persistBarbershops([updatedBarbershop]);
+            }
+          }
+        } catch (error) {
+          console.error('Erro ao tentar salvar barbearia no Supabase:', error);
+          toast.error("Cadastro realizado, mas houve um problema ao salvar no banco de dados");
+          // Não bloqueia o cadastro se falhar no Supabase
+        }
+      }
+
+      // Serviços: array vazio (continuar após salvar barbearia)
       persistServices([]);
 
       // Estoque/Inventário: estrutura vazia
@@ -521,7 +579,11 @@ const Auth = () => {
       setIsLoading(false);
       toast.success("Cadastro Realizado com Sucesso!", { duration: 2000 });
       setTab("login");
-    }, 500);
+    } catch (error) {
+      console.error('Erro no cadastro:', error);
+      setIsLoading(false);
+      toast.error("Erro ao realizar cadastro. Tente novamente.");
+    }
   };
 
   return (

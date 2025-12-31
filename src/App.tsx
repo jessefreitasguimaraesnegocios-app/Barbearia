@@ -89,20 +89,16 @@ const App = () => {
                   <Route path="/barbearias" element={<Barbearias />} />
                   <Route path="/services" element={<Services />} />
 
-                  {/* Rotas protegidas */}
+                  {/* Rotas protegidas - Admin usa RequireAdmin (localStorage) não ProtectedRoute (Supabase) */}
                   <Route path="/admin" element={
-                    <ProtectedRoute>
-                      <RequireAdmin>
-                        <Admin />
-                      </RequireAdmin>
-                    </ProtectedRoute>
+                    <RequireAdmin>
+                      <Admin />
+                    </RequireAdmin>
                   } />
                   <Route path="/admin/bookings" element={
-                    <ProtectedRoute>
-                      <RequireAdmin>
-                        <AdminBookings />
-                      </RequireAdmin>
-                    </ProtectedRoute>
+                    <RequireAdmin>
+                      <AdminBookings />
+                    </RequireAdmin>
                   } />
                   <Route path="/booking" element={
                     <ProtectedRoute>
@@ -126,95 +122,69 @@ const App = () => {
                     </ProtectedRoute>
                   } />
                   <Route path="/admin/agendamentos" element={
-                    <ProtectedRoute>
-                      <RequireAdmin>
-                        <AdminBookings />
-                      </RequireAdmin>
-                    </ProtectedRoute>
+                    <RequireAdmin>
+                      <AdminBookings />
+                    </RequireAdmin>
                   } />
                   <Route path="/admin/financas" element={
-                    <ProtectedRoute>
-                      <RequireAdmin>
-                        <AdminFinances />
-                      </RequireAdmin>
-                    </ProtectedRoute>
+                    <RequireAdmin>
+                      <AdminFinances />
+                    </RequireAdmin>
                   } />
                   <Route path="/admin/financas/despesas" element={
-                    <ProtectedRoute>
-                      <RequireAdmin>
-                        <AdminExpenses />
-                      </RequireAdmin>
-                    </ProtectedRoute>
+                    <RequireAdmin>
+                      <AdminExpenses />
+                    </RequireAdmin>
                   } />
                   <Route path="/admin/financas/receita-barbearia" element={
-                    <ProtectedRoute>
-                      <RequireAdmin>
-                        <AdminBarbershopRevenue />
-                      </RequireAdmin>
-                    </ProtectedRoute>
+                    <RequireAdmin>
+                      <AdminBarbershopRevenue />
+                    </RequireAdmin>
                   } />
                   <Route path="/admin/financas/receita-loja" element={
-                    <ProtectedRoute>
-                      <RequireAdmin>
-                        <AdminStoreRevenue />
-                      </RequireAdmin>
-                    </ProtectedRoute>
+                    <RequireAdmin>
+                      <AdminStoreRevenue />
+                    </RequireAdmin>
                   } />
                   <Route path="/admin/servicos" element={
-                    <ProtectedRoute>
-                      <RequireAdmin>
-                        <AdminServices />
-                      </RequireAdmin>
-                    </ProtectedRoute>
+                    <RequireAdmin>
+                      <AdminServices />
+                    </RequireAdmin>
                   } />
                   <Route path="/admin/perfil" element={
-                    <ProtectedRoute>
-                      <RequireAdmin>
-                        <AdminProfile />
-                      </RequireAdmin>
-                    </ProtectedRoute>
+                    <RequireAdmin>
+                      <AdminProfile />
+                    </RequireAdmin>
                   } />
                   <Route path="/admin/colaboradores" element={
-                    <ProtectedRoute>
-                      <RequireAdmin>
-                        <AdminCollaborators />
-                      </RequireAdmin>
-                    </ProtectedRoute>
+                    <RequireAdmin>
+                      <AdminCollaborators />
+                    </RequireAdmin>
                   } />
                   <Route path="/admin/colaboradores/:id" element={
-                    <ProtectedRoute>
-                      <RequireAdmin>
-                        <CollaboratorDetails />
-                      </RequireAdmin>
-                    </ProtectedRoute>
+                    <RequireAdmin>
+                      <CollaboratorDetails />
+                    </RequireAdmin>
                   } />
                   <Route path="/admin/colaboradores/:id/folha-ponto" element={
-                    <ProtectedRoute>
-                      <RequireAdmin>
-                        <CollaboratorTimeSheet />
-                      </RequireAdmin>
-                    </ProtectedRoute>
+                    <RequireAdmin>
+                      <CollaboratorTimeSheet />
+                    </RequireAdmin>
                   } />
                   <Route path="/admin/vips" element={
-                    <ProtectedRoute>
-                      <RequireAdmin>
-                        <AdminVip />
-                      </RequireAdmin>
-                    </ProtectedRoute>
+                    <RequireAdmin>
+                      <AdminVip />
+                    </RequireAdmin>
                   } />
                   <Route path="/admin/estoque" element={
-                    <ProtectedRoute>
-                      <RequireAdmin>
-                        <AdminInventory />
-                      </RequireAdmin>
-                    </ProtectedRoute>
+                    <RequireAdmin>
+                      <AdminInventory />
+                    </RequireAdmin>
                   } />
                   <Route path="/admin/loja" element={
-                    <ProtectedRoute>
-                      <RequireAdmin>
-                        <AdminShop />
-                      </RequireAdmin>
-                    </ProtectedRoute>
+                    <RequireAdmin>
+                      <AdminShop />
+                    </RequireAdmin>
                   } />
 
                   {/* Rota de página não encontrada */}

@@ -1,65 +1,75 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { ReactNode, useEffect, useState } from "react";
-import { useAuthContext } from "@/context/AuthContext";
-import { supabase } from "@/lib/supabase";
 
 type Props = {
 	children: ReactNode;
 };
 
+type ActiveCollaborator = {
+	id: string;
+	name: string;
+	email: string;
+	role: string;
+	loggedAt?: string;
+};
+
 const RequireAdmin = ({ children }: Props) => {
 	const location = useLocation();
-	const { user, loading } = useAuthContext();
-	const [isAdmin, setIsAdmin] = useState(false);
-	const [checkingAdmin, setCheckingAdmin] = useState(true);
+	// Ler do localStorage imediatamente no estado inicial (igual ao Navbar)
+	const [activeCollaborator, setActiveCollaborator] = useState<ActiveCollaborator | null>(() => {
+		try {
+			const stored = localStorage.getItem("activeCollaborator");
+			return stored ? (JSON.parse(stored) as ActiveCollaborator) : null;
+		} catch {
+			return null;
+		}
+	});
 
 	useEffect(() => {
-		const checkAdmin = async () => {
-			if (loading || !user) {
-				setCheckingAdmin(false);
-				setIsAdmin(false);
-				return;
-			}
-
+		// Verificar colaborador ativo no localStorage (mesma lógica do Navbar)
+		const checkAdmin = () => {
 			try {
-				// Consulta direta - a nova RLS policy permite ler próprio profile
-				const { data, error } = await supabase
-					.from('profiles')
-					.select('is_admin')
-					.eq('id', user.id)
-					.single();
-
-				if (error) {
-					// Se erro for de permissão (RLS) ou não encontrado, não é admin
-					if (error.code === 'PGRST116' || error.code === '42501') {
-						// Profile não existe ou sem permissão
-						console.warn('Profile não encontrado ou sem permissão:', error.message);
-						setIsAdmin(false);
-					} else {
-						console.error('Erro ao verificar admin:', error);
-						setIsAdmin(false);
-					}
+				const stored = localStorage.getItem("activeCollaborator");
+				if (stored) {
+					const parsed = JSON.parse(stored) as ActiveCollaborator;
+					setActiveCollaborator(parsed);
 				} else {
-					// Verificar se is_admin é true
-					setIsAdmin(data?.is_admin === true);
+					setActiveCollaborator(null);
 				}
-			} catch (error: any) {
-				console.error('Erro ao verificar admin:', error);
-				// Em caso de erro inesperado, não é admin
-				setIsAdmin(false);
-			} finally {
-				setCheckingAdmin(false);
+			} catch (error) {
+				console.error('Erro ao verificar colaborador ativo:', error);
+				setActiveCollaborator(null);
 			}
 		};
 
+		// Verificar imediatamente
 		checkAdmin();
-	}, [user, loading]);
 
-	if (loading || checkingAdmin) {
-		return <div>Carregando...</div>;
-	}
+		// Ouvir mudanças no localStorage
+		const handleStorage = (e: StorageEvent) => {
+			if (e.key === "activeCollaborator") {
+				checkAdmin();
+			}
+		};
 
-	if (!user || !isAdmin) {
+		window.addEventListener("storage", handleStorage);
+
+		return () => {
+			window.removeEventListener("storage", handleStorage);
+		};
+	}, []);
+
+	// Verificar se o colaborador tem role de admin (socio ou dono)
+	const isAdmin = activeCollaborator && (
+		activeCollaborator.role === "socio" ||
+		activeCollaborator.role === "dono" ||
+		activeCollaborator.role === "socio-barbeiro" ||
+		activeCollaborator.role === "dono-barbeiro" ||
+		activeCollaborator.role === "socio-investidor"
+	);
+
+	// Se não tem colaborador ativo ou não é admin, redirecionar para home (não para auth)
+	if (!activeCollaborator || !isAdmin) {
 		return <Navigate to="/" replace state={{ from: location }} />;
 	}
 

@@ -1,4 +1,4 @@
-# 🚀 Configurar Variáveis de Ambiente no Vercel
+# 🌐 Configurar Deploy no Vercel
 
 ## ❌ Problema
 
@@ -121,4 +121,5 @@ Após configurar:
 1. O login local (email/senha) deve funcionar normalmente
 2. O login com Google deve funcionar (se estiver configurado)
 3. Não devem mais aparecer erros 401/404 no console
+
 
