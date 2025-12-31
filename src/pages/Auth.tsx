@@ -390,7 +390,44 @@ const Auth = () => {
         return;
       }
 
-      const id =
+      // Criar usuário no Supabase Auth (se configurado)
+      let userId: string | null = null;
+      if (isSupabaseReady() && supabase) {
+        try {
+          const { data: authData, error: authError } = await supabase.auth.signUp({
+            email: email,
+            password: signupPassword,
+            options: {
+              data: {
+                full_name: signupResponsavel.trim(),
+                phone: phoneNumbers,
+                cpf: cpfNumbers,
+                role: "socio",
+              },
+            },
+          });
+
+          if (authError) {
+            console.error('Erro ao criar usuário no Supabase Auth:', authError);
+            toast.error(`Erro ao criar conta: ${authError.message}`);
+            setIsLoading(false);
+            return;
+          }
+
+          if (authData?.user) {
+            userId = authData.user.id;
+            console.log('✅ Usuário criado no Supabase Auth:', authData.user.id);
+          }
+        } catch (error: any) {
+          console.error('Erro ao criar usuário no Supabase:', error);
+          toast.error(`Erro ao criar conta: ${error?.message || 'Erro desconhecido'}`);
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      // Usar o ID do Supabase Auth se disponível, caso contrário gerar UUID local
+      const id = userId || 
         (typeof crypto !== "undefined" && "randomUUID" in crypto && crypto.randomUUID()) ||
         `c_${Math.random().toString(36).slice(2, 10)}`;
 
@@ -445,10 +482,10 @@ const Auth = () => {
       // Salvar barbearia no localStorage
       persistBarbershops([barbershopWithVencimento]);
 
-      // Salvar barbearia no Supabase e popular com dados padrão
+      // Salvar barbearia no Supabase e popular com dados padrão (usando userId do Auth se disponível)
       if (isSupabaseReady()) {
         try {
-          await createBarbershopWithDefaults(barbershopWithVencimento, id);
+          await createBarbershopWithDefaults(barbershopWithVencimento, userId || id);
           console.log('✅ Barbearia criada no Supabase com dados padrão');
           toast.success(`Barbearia criada com ${DEFAULT_SERVICES.length} serviços e ${DEFAULT_STORE_PRODUCTS.length} produtos padrão!`);
         } catch (error: any) {
