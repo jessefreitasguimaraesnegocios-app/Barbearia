@@ -34,6 +34,7 @@ import NotFound from "./pages/NotFound";
 import CollaboratorMenu from "./pages/CollaboratorMenu";
 import RequireAdmin from "./components/RequireAdmin";
 import { DatabaseSetup } from "./components/DatabaseSetup";
+import { SupabaseSync } from "./components/SupabaseSync";
 
 const queryClient = new QueryClient();
 
@@ -79,6 +80,7 @@ const App = () => {
               <Toaster />
               <Sonner />
               <RunMigrations />
+              <SupabaseSync />
               <BrowserRouter>
                 <Routes>
                   <Route path="/" element={<Index />} />

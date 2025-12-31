@@ -1,7 +1,9 @@
 import { Barbershop, DEFAULT_BARBERSHOPS, BarbershopStatus } from "@/data/barbershops";
 import { differenceInDays, parseISO, isAfter, addDays } from "date-fns";
+import { syncBarbershopsFromSupabase } from "./sync-supabase";
 
 const STORAGE_KEY = "barberbook_admin_barbershops";
+const LAST_SYNC_KEY = "barberbook_admin_barbershops_last_sync";
 
 const isValidBarbershop = (entry: unknown): entry is Barbershop => {
   if (!entry || typeof entry !== "object") {
@@ -100,13 +102,32 @@ export const loadBarbershops = (): Barbershop[] => {
       .map(checkPaymentStatus)
       .filter((bs): bs is Barbershop => bs !== null);
 
-    // Se a chave existe no localStorage, retornar o que está salvo (mesmo que vazio)
-    // Isso permite que novos usuários comecem com dados vazios
     persistBarbershops(validBarbershops);
     return validBarbershops;
   } catch {
     return DEFAULT_BARBERSHOPS;
   }
+};
+
+// Função para forçar sincronização (chamada na inicialização)
+export const syncBarbershopsIfNeeded = async () => {
+  const lastSync = localStorage.getItem(LAST_SYNC_KEY);
+  const now = Date.now();
+  const fiveMinutes = 5 * 60 * 1000;
+  const shouldSync = !lastSync || (now - parseInt(lastSync, 10)) > fiveMinutes;
+
+  if (shouldSync) {
+    try {
+      const synced = await syncBarbershopsFromSupabase();
+      if (synced && synced.length > 0) {
+        localStorage.setItem(LAST_SYNC_KEY, now.toString());
+        return true;
+      }
+    } catch (error) {
+      console.warn('Erro ao sincronizar barbearias:', error);
+    }
+  }
+  return false;
 };
 
 export const persistBarbershops = (barbershops: Barbershop[]) => {

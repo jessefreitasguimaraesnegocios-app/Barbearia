@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { DEFAULT_BARBERSHOPS } from '@/data/barbershops';
 import { DEFAULT_SERVICES } from '@/data/services';
 import { DEFAULT_COLLABORATORS } from '@/data/collaborators';
