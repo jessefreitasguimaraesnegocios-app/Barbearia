@@ -430,6 +430,7 @@ const AdminInventory = () => {
       vipDiscount: Number.isNaN(numericVipDiscount) ? 0 : numericVipDiscount,
       vipPromotionLabel: productForm.vipPromotionLabel.trim(),
       createdAt: activeProduct?.createdAt ?? new Date().toISOString(),
+      category: activeProduct?.category || "produtos", // Categoria padrão se não tiver
     };
 
     setInventory((previous) => {
@@ -442,10 +443,33 @@ const AdminInventory = () => {
         setActiveProductId(sanitizedProduct.id);
       }
 
-      return {
+      const updatedInventory = {
         ...previous,
         storeProducts,
       };
+
+      // Persistir imediatamente e disparar evento de storage
+      if (initializedRef.current) {
+        const storedActiveId = localStorage.getItem("admin_active_barbershop_id");
+        const barbershopId = storedActiveId || activeBarbershopId;
+        
+        persistInventory(updatedInventory, barbershopId);
+        
+        // Disparar evento customizado para atualizar outras abas
+        window.dispatchEvent(new Event('storage'));
+        
+        // Disparar evento StorageEvent manualmente para a mesma aba
+        const storageKey = `barberbook_admin_inventory_${barbershopId || 'default'}`;
+        const storageEvent = new StorageEvent('storage', {
+          key: storageKey,
+          newValue: JSON.stringify(updatedInventory),
+          oldValue: JSON.stringify(previous),
+          storageArea: localStorage,
+        });
+        window.dispatchEvent(storageEvent);
+      }
+
+      return updatedInventory;
     });
 
     toast({

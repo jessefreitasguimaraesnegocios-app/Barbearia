@@ -147,8 +147,12 @@ const Shop = () => {
 
   const displayProducts = useMemo(() => {
     const allProducts = products;
+    // Filtrar produtos: devem ter categoria, não ser rascunho, e corresponder à categoria selecionada
     return allProducts.filter(
-      (product) => product.category === selectedCategory && product.category && product.category !== "rascunho"
+      (product) => 
+        product.category && 
+        product.category !== "rascunho" && 
+        (product.category === selectedCategory || selectedCategory === "produtos") // Se não tiver categoria definida, mostrar em "produtos"
     );
   }, [products, selectedCategory]);
 
