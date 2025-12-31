@@ -12,10 +12,7 @@ BEGIN;
 -- ============================================
 -- O trigger handle_new_user() já cria o profile automaticamente
 -- A política deve permitir inserção pelo próprio trigger (SECURITY DEFINER)
-
--- Manter política existente, mas garantir que funciona
--- A política atual já permite inserção por usuários autenticados
--- O trigger usa SECURITY DEFINER, então pode inserir mesmo com RLS ativo
+-- A política atual já está correta, não precisa mudar
 
 -- ============================================
 -- BARBEARIAS - Permitir criação por usuários autenticados
@@ -37,35 +34,27 @@ CREATE POLICY barbershops_insert_admin ON public.barbershops
 -- Não precisa mudar
 
 -- ============================================
--- SERVICES - Permitir criação por usuários autenticados (via barbershop_id)
+-- SERVICES - Permitir criação por usuários autenticados
 -- ============================================
--- Atualizar política para permitir criação de serviços para barbearias próprias
+-- Simplificar: permitir qualquer usuário autenticado criar serviços
 DROP POLICY IF EXISTS services_insert_admin ON public.services;
 CREATE POLICY services_insert_admin ON public.services
   FOR INSERT 
   WITH CHECK (
     public.is_admin()
-    OR EXISTS (
-      SELECT 1 FROM public.barbershops b
-      WHERE b.id = services.barbershop_id
-      AND (b.owner_id = auth.uid() OR b.owner_id IS NULL)
-    )
+    OR (auth.role() = 'authenticated' AND auth.uid() IS NOT NULL)
   );
 
 -- ============================================
 -- STORE_PRODUCTS - Permitir criação por usuários autenticados
 -- ============================================
+-- Simplificar: permitir qualquer usuário autenticado criar produtos
 DROP POLICY IF EXISTS store_products_insert_admin ON public.store_products;
 CREATE POLICY store_products_insert_admin ON public.store_products
   FOR INSERT 
   WITH CHECK (
     public.is_admin()
-    OR EXISTS (
-      SELECT 1 FROM public.barbershops b
-      WHERE b.id = store_products.barbershop_id
-      AND (b.owner_id = auth.uid() OR b.owner_id IS NULL)
-    )
+    OR (auth.role() = 'authenticated' AND auth.uid() IS NOT NULL)
   );
 
 COMMIT;
-
